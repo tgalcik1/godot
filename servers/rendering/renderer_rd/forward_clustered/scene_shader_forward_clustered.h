@@ -64,9 +64,11 @@ public:
 		constexpr static uint16_t SHADER_VERSION_DEPTH_PASS_WITH_OBJECT_ID_MULTIVIEW = 8;
 		constexpr static uint16_t SHADER_VERSION_DEPTH_PASS_WITH_SEGMENT = 9;
 		constexpr static uint16_t SHADER_VERSION_DEPTH_PASS_WITH_SEGMENT_MULTIVIEW = 10;
-		constexpr static uint16_t SHADER_VERSION_DEPTH_PASS_WITH_MATERIAL = 11;
-		constexpr static uint16_t SHADER_VERSION_DEPTH_PASS_WITH_SDF = 12;
-		constexpr static uint16_t SHADER_VERSION_COLOR_PASS = 13;
+		constexpr static uint16_t SHADER_VERSION_DEPTH_PASS_WITH_OUTLINES = 11;
+		constexpr static uint16_t SHADER_VERSION_DEPTH_PASS_WITH_OUTLINES_MULTIVIEW = 12;
+		constexpr static uint16_t SHADER_VERSION_DEPTH_PASS_WITH_MATERIAL = 13;
+		constexpr static uint16_t SHADER_VERSION_DEPTH_PASS_WITH_SDF = 14;
+		constexpr static uint16_t SHADER_VERSION_COLOR_PASS = 15;
 	};
 
 	enum ShaderColorPassFlags {
@@ -85,6 +87,7 @@ public:
 		PIPELINE_VERSION_DEPTH_PASS_WITH_NORMAL_AND_ROUGHNESS_AND_VOXEL_GI,
 		PIPELINE_VERSION_DEPTH_PASS_WITH_OBJECT_ID,
 		PIPELINE_VERSION_DEPTH_PASS_WITH_SEGMENT,
+		PIPELINE_VERSION_DEPTH_PASS_WITH_OUTLINES,
 		PIPELINE_VERSION_DEPTH_PASS_WITH_MATERIAL,
 		PIPELINE_VERSION_DEPTH_PASS_WITH_SDF,
 		PIPELINE_VERSION_DEPTH_PASS_MULTIVIEW,
@@ -92,6 +95,7 @@ public:
 		PIPELINE_VERSION_DEPTH_PASS_WITH_NORMAL_AND_ROUGHNESS_AND_VOXEL_GI_MULTIVIEW,
 		PIPELINE_VERSION_DEPTH_PASS_WITH_OBJECT_ID_MULTIVIEW,
 		PIPELINE_VERSION_DEPTH_PASS_WITH_SEGMENT_MULTIVIEW,
+		PIPELINE_VERSION_DEPTH_PASS_WITH_OUTLINES_MULTIVIEW,
 		PIPELINE_VERSION_COLOR_PASS,
 		PIPELINE_VERSION_MAX
 	};
@@ -269,8 +273,10 @@ public:
 		bool uses_normal_texture = false;
 		bool uses_object_id_texture = false;
 		bool uses_segment_texture = false;
+		bool uses_outlines_texture = false;
 		bool writes_object_id = false;
 		bool writes_segment = false;
+		bool writes_outlines = false;
 		bool uses_time = false;
 		bool uses_vertex_time = false;
 		bool uses_fragment_time = false;

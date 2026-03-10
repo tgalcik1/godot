@@ -3746,6 +3746,7 @@ void Node3DEditorViewport::_menu_option(int p_option) {
 		case VIEW_DISPLAY_LIGHTING:
 		case VIEW_DISPLAY_DEPTH_BUFFER:
 		case VIEW_DISPLAY_SEGMENT_BUFFER:
+		case VIEW_DISPLAY_OUTLINES_BUFFER:
 		case VIEW_DISPLAY_OBJECT_ID_BUFFER:
 		case VIEW_DISPLAY_NORMAL_BUFFER:
 		case VIEW_DISPLAY_DEBUG_SHADOW_ATLAS:
@@ -3777,6 +3778,7 @@ void Node3DEditorViewport::_menu_option(int p_option) {
 				VIEW_DISPLAY_LIGHTING,
 				VIEW_DISPLAY_DEPTH_BUFFER,
 				VIEW_DISPLAY_SEGMENT_BUFFER,
+				VIEW_DISPLAY_OUTLINES_BUFFER,
 				VIEW_DISPLAY_OBJECT_ID_BUFFER,
 				VIEW_DISPLAY_NORMAL_BUFFER,
 				VIEW_DISPLAY_DEBUG_SHADOW_ATLAS,
@@ -3810,6 +3812,7 @@ void Node3DEditorViewport::_menu_option(int p_option) {
 				Viewport::DEBUG_DRAW_LIGHTING,
 				Viewport::DEBUG_DRAW_DEPTH_BUFFER,
 				Viewport::DEBUG_DRAW_SEGMENT_BUFFER,
+				Viewport::DEBUG_DRAW_OUTLINES_BUFFER,
 				Viewport::DEBUG_DRAW_OBJECT_ID_BUFFER,
 				Viewport::DEBUG_DRAW_NORMAL_BUFFER,
 				Viewport::DEBUG_DRAW_SHADOW_ATLAS,
@@ -5828,6 +5831,7 @@ Node3DEditorViewport::Node3DEditorViewport(Node3DEditor *p_spatial_editor, int p
 	display_submenu->add_separator();
 	_add_advanced_debug_draw_mode_item(display_submenu, TTRC("Depth Buffer"), VIEW_DISPLAY_DEPTH_BUFFER, SupportedRenderingMethods::FORWARD_PLUS_MOBILE);
 	_add_advanced_debug_draw_mode_item(display_submenu, TTRC("Segment Buffer"), VIEW_DISPLAY_SEGMENT_BUFFER, SupportedRenderingMethods::FORWARD_PLUS);
+	_add_advanced_debug_draw_mode_item(display_submenu, TTRC("Outlines Buffer"), VIEW_DISPLAY_OUTLINES_BUFFER, SupportedRenderingMethods::FORWARD_PLUS);
 	_add_advanced_debug_draw_mode_item(display_submenu, TTRC("Object ID Buffer"), VIEW_DISPLAY_OBJECT_ID_BUFFER, SupportedRenderingMethods::FORWARD_PLUS);
 	// TRANSLATORS: "Normal" as in "normal vector", not "normal life".
 	_add_advanced_debug_draw_mode_item(display_submenu, TTRC("Normal Buffer"), VIEW_DISPLAY_NORMAL_BUFFER, SupportedRenderingMethods::FORWARD_PLUS);

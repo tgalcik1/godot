@@ -1062,6 +1062,10 @@ layout(location = 0) out float object_id_output_buffer;
 #ifdef MODE_RENDER_SEGMENT
 layout(location = 0) out float segment_output_buffer;
 #endif
+
+#ifdef MODE_RENDER_OUTLINES
+layout(location = 0) out vec4 outlines_output_buffer;
+#endif
 #else // RENDER DEPTH
 
 #ifdef MODE_SEPARATE_SPECULAR
@@ -1077,6 +1081,10 @@ layout(location = 0) out vec4 frag_color;
 
 #ifdef MOTION_VECTORS
 layout(location = 2) out vec2 motion_vector;
+#endif
+
+#ifndef MODE_RENDER_DEPTH
+vec3 frag_to_light_outlines = vec3(0.0);
 #endif
 
 float object_id_hash(vec3 p_world_origin) {
@@ -1261,6 +1269,7 @@ void fragment_shader(in SceneData scene_data) {
 	float ao = 1.0;
 	float ao_light_affect = 0.0;
 	float segment = 0.0;
+	vec3 outlines = vec3(0.0);
 
 	float alpha_highp = float(instances.data[instance_index].flags >> INSTANCE_FLAGS_FADE_SHIFT) / float(255.0);
 
@@ -2977,6 +2986,10 @@ void fragment_shader(in SceneData scene_data) {
 
 #ifdef MODE_RENDER_SEGMENT
 	segment_output_buffer = segment;
+#endif
+
+#ifdef MODE_RENDER_OUTLINES
+	outlines_output_buffer = vec4(outlines, 1.0);
 #endif
 
 //nothing happens, so a tree-ssa optimizer will result in no fragment shader :)

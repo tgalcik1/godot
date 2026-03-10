@@ -57,6 +57,8 @@
 #define RB_TEX_BACK_OBJECT_ID SNAME("back_object_id")
 #define RB_TEX_SEGMENT SNAME("segment")
 #define RB_TEX_BACK_SEGMENT SNAME("back_segment")
+#define RB_TEX_OUTLINES SNAME("outlines")
+#define RB_TEX_BACK_OUTLINES SNAME("back_outlines")
 #define RB_TEX_VOXEL_GI SNAME("voxel_gi")
 #define RB_TEX_VOXEL_GI_MSAA SNAME("voxel_gi_msaa")
 
@@ -125,7 +127,8 @@ public:
 			DEPTH_FB_ROUGHNESS,
 			DEPTH_FB_ROUGHNESS_VOXELGI,
 			DEPTH_FB_OBJECT_ID,
-			DEPTH_FB_SEGMENT
+			DEPTH_FB_SEGMENT,
+			DEPTH_FB_OUTLINES
 		};
 
 		RID render_sdfgi_uniform_set;
@@ -162,6 +165,14 @@ public:
 		RID get_back_segment() const { return render_buffers->get_texture(RB_SCOPE_FORWARD_CLUSTERED, RB_TEX_BACK_SEGMENT); }
 		RID get_back_segment(uint32_t p_layer) { return render_buffers->get_texture_slice(RB_SCOPE_FORWARD_CLUSTERED, RB_TEX_BACK_SEGMENT, p_layer, 0); }
 
+		void ensure_outlines_texture();
+		bool has_outlines() const { return render_buffers->has_texture(RB_SCOPE_FORWARD_CLUSTERED, RB_TEX_OUTLINES); }
+		RID get_outlines() const { return render_buffers->get_texture(RB_SCOPE_FORWARD_CLUSTERED, RB_TEX_OUTLINES); }
+		RID get_outlines(uint32_t p_layer) { return render_buffers->get_texture_slice(RB_SCOPE_FORWARD_CLUSTERED, RB_TEX_OUTLINES, p_layer, 0); }
+		bool has_back_outlines() const { return render_buffers->has_texture(RB_SCOPE_FORWARD_CLUSTERED, RB_TEX_BACK_OUTLINES); }
+		RID get_back_outlines() const { return render_buffers->get_texture(RB_SCOPE_FORWARD_CLUSTERED, RB_TEX_BACK_OUTLINES); }
+		RID get_back_outlines(uint32_t p_layer) { return render_buffers->get_texture_slice(RB_SCOPE_FORWARD_CLUSTERED, RB_TEX_BACK_OUTLINES, p_layer, 0); }
+
 		void ensure_voxelgi();
 		bool has_voxelgi() const { return render_buffers->has_texture(RB_SCOPE_FORWARD_CLUSTERED, RB_TEX_VOXEL_GI); }
 		RID get_voxelgi() const { return render_buffers->get_texture(RB_SCOPE_FORWARD_CLUSTERED, RB_TEX_VOXEL_GI); }
@@ -193,6 +204,8 @@ public:
 		static uint32_t get_object_id_usage_bits();
 		static RD::DataFormat get_segment_format();
 		static uint32_t get_segment_usage_bits();
+		static RD::DataFormat get_outlines_format();
+		static uint32_t get_outlines_usage_bits();
 		static RD::DataFormat get_voxelgi_format();
 		static uint32_t get_voxelgi_usage_bits(bool p_resolve, bool p_msaa, bool p_storage);
 	};
@@ -222,15 +235,23 @@ private:
 		SEGMENT_BUFFER_SOURCE_SNAPSHOT,
 	};
 
+	enum OutlinesBufferSource {
+		OUTLINES_BUFFER_SOURCE_DEFAULT,
+		OUTLINES_BUFFER_SOURCE_LIVE,
+		OUTLINES_BUFFER_SOURCE_SNAPSHOT,
+	};
+
 	void _update_render_base_uniform_set();
 	RID _setup_sdfgi_render_pass_uniform_set(RID p_albedo_texture, RID p_emission_texture, RID p_emission_aniso_texture, RID p_geom_facing_texture, const RendererRD::MaterialStorage::Samplers &p_samplers, uint32_t p_uniform_buffer_index);
-	RID _setup_render_pass_uniform_set(RenderListType p_render_list, const RenderDataRD *p_render_data, RID p_radiance_texture, const RendererRD::MaterialStorage::Samplers &p_samplers, uint32_t p_uniform_buffer_index, bool p_use_directional_shadow_atlas = false, NormalBufferSource p_normal_buffer_source = NORMAL_BUFFER_SOURCE_LIVE, ObjectIdBufferSource p_object_id_buffer_source = OBJECT_ID_BUFFER_SOURCE_LIVE, SegmentBufferSource p_segment_buffer_source = SEGMENT_BUFFER_SOURCE_LIVE);
+	RID _setup_render_pass_uniform_set(RenderListType p_render_list, const RenderDataRD *p_render_data, RID p_radiance_texture, const RendererRD::MaterialStorage::Samplers &p_samplers, uint32_t p_uniform_buffer_index, bool p_use_directional_shadow_atlas = false, NormalBufferSource p_normal_buffer_source = NORMAL_BUFFER_SOURCE_LIVE, ObjectIdBufferSource p_object_id_buffer_source = OBJECT_ID_BUFFER_SOURCE_LIVE, SegmentBufferSource p_segment_buffer_source = SEGMENT_BUFFER_SOURCE_LIVE, OutlinesBufferSource p_outlines_buffer_source = OUTLINES_BUFFER_SOURCE_LIVE);
 	void _render_buffers_ensure_back_normal_roughness_texture(const RenderDataRD *p_render_data);
 	void _render_buffers_copy_back_normal_roughness(const RenderDataRD *p_render_data, bool p_use_msaa = false);
 	void _render_buffers_ensure_back_object_id_texture(const RenderDataRD *p_render_data);
 	void _render_buffers_copy_back_object_id(const RenderDataRD *p_render_data);
 	void _render_buffers_ensure_back_segment_texture(const RenderDataRD *p_render_data);
 	void _render_buffers_copy_back_segment(const RenderDataRD *p_render_data);
+	void _render_buffers_ensure_back_outlines_texture(const RenderDataRD *p_render_data);
+	void _render_buffers_copy_back_outlines(const RenderDataRD *p_render_data);
 
 	struct BestFitNormal {
 		BestFitNormalShaderRD shader;
@@ -255,6 +276,7 @@ private:
 		PASS_MODE_DEPTH_NORMAL_ROUGHNESS_VOXEL_GI,
 		PASS_MODE_DEPTH_OBJECT_ID,
 		PASS_MODE_DEPTH_SEGMENT,
+		PASS_MODE_DEPTH_OUTLINES,
 		PASS_MODE_DEPTH_MATERIAL,
 		PASS_MODE_SDF,
 		PASS_MODE_MAX
@@ -482,6 +504,8 @@ private:
 		bool used_object_id_write = false;
 		bool used_segment_texture = false;
 		bool used_segment_write = false;
+		bool used_outlines_texture = false;
+		bool used_outlines_write = false;
 		bool used_sss = false;
 		bool used_lightmap = false;
 		bool used_opaque_stencil = false;
@@ -565,10 +589,12 @@ private:
 			FLAG_WRITES_OBJECT_ID = 65536,
 			FLAG_USES_SEGMENT_TEXTURE = 131072,
 			FLAG_WRITES_SEGMENT = 262144,
-			FLAG_USES_DOUBLE_SIDED_SHADOWS = 524288,
-			FLAG_USES_PARTICLE_TRAILS = 1048576,
-			FLAG_USES_MOTION_VECTOR = 2097152,
-			FLAG_USES_STENCIL = 4194304,
+			FLAG_USES_OUTLINES_TEXTURE = 524288,
+			FLAG_WRITES_OUTLINES = 1048576,
+			FLAG_USES_DOUBLE_SIDED_SHADOWS = 2097152,
+			FLAG_USES_PARTICLE_TRAILS = 4194304,
+			FLAG_USES_MOTION_VECTOR = 8388608,
+			FLAG_USES_STENCIL = 16777216,
 			FLAG_USES_PREPASS_FEEDBACK = FLAG_USES_DEPTH_TEXTURE | FLAG_USES_NORMAL_TEXTURE,
 		};
 
@@ -711,6 +737,7 @@ private:
 				uint32_t use_normal_and_roughness : 1;
 				uint32_t use_object_id : 1;
 				uint32_t use_segment : 1;
+				uint32_t use_outlines : 1;
 				uint32_t use_lightmaps : 1;
 				uint32_t use_voxelgi : 1;
 				uint32_t use_sdfgi : 1;
@@ -749,6 +776,8 @@ private:
 		bool object_id_write_used = false;
 		bool segment_texture_used = false;
 		bool segment_write_used = false;
+		bool outlines_texture_used = false;
+		bool outlines_write_used = false;
 		bool sss_used = false;
 	} global_surface_data;
 
