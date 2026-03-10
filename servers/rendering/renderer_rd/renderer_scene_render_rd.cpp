@@ -1013,6 +1013,8 @@ bool RendererSceneRenderRD::_debug_draw_can_use_effects(RSE::ViewportDebugDraw p
 		case RSE::VIEWPORT_DEBUG_DRAW_DECAL_ATLAS:
 		case RSE::VIEWPORT_DEBUG_DRAW_MOTION_VECTORS:
 		// Modes that draws a buffer over viewport needs camera effects because if the buffer is not available it will be equivalent to normal draw mode.
+		case RSE::VIEWPORT_DEBUG_DRAW_DEPTH_BUFFER:
+		case RSE::VIEWPORT_DEBUG_DRAW_OBJECT_ID_BUFFER:
 		case RSE::VIEWPORT_DEBUG_DRAW_NORMAL_BUFFER:
 		case RSE::VIEWPORT_DEBUG_DRAW_SSAO:
 		case RSE::VIEWPORT_DEBUG_DRAW_SSIL:
@@ -1110,6 +1112,35 @@ void RendererSceneRenderRD::_render_buffers_debug_draw(const RenderDataRD *p_ren
 	if (debug_draw == RSE::VIEWPORT_DEBUG_DRAW_INTERNAL_BUFFER) {
 		Size2 rtsize = texture_storage->render_target_get_size(render_target);
 		copy_effects->copy_to_fb_rect(rb->get_internal_texture(), texture_storage->render_target_get_rd_framebuffer(render_target), Rect2(Vector2(), rtsize), false, false);
+	}
+
+	if (debug_draw == RSE::VIEWPORT_DEBUG_DRAW_DEPTH_BUFFER) {
+		_render_buffers_ensure_depth_texture(p_render_data);
+		_render_buffers_copy_depth_texture(p_render_data);
+		if (rb->has_texture(RB_SCOPE_BUFFERS, RB_TEX_BACK_DEPTH)) {
+			Size2 rtsize = texture_storage->render_target_get_size(render_target);
+			copy_effects->copy_to_fb_rect(rb->get_texture(RB_SCOPE_BUFFERS, RB_TEX_BACK_DEPTH), texture_storage->render_target_get_rd_framebuffer(render_target), Rect2(Vector2(), rtsize), false, true);
+		}
+	}
+
+	if (debug_draw == RSE::VIEWPORT_DEBUG_DRAW_OBJECT_ID_BUFFER) {
+		static const StringName rb_scope_forward_clustered("forward_clustered");
+		static const StringName rb_tex_back_object_id("back_object_id");
+		static const StringName rb_tex_object_id("object_id");
+
+		RID object_id_texture;
+		if (rb->has_texture(rb_scope_forward_clustered, rb_tex_back_object_id)) {
+			object_id_texture = rb->get_texture(rb_scope_forward_clustered, rb_tex_back_object_id);
+		} else if (rb->has_texture(rb_scope_forward_clustered, rb_tex_object_id)) {
+			object_id_texture = rb->get_texture(rb_scope_forward_clustered, rb_tex_object_id);
+		}
+
+		Size2 rtsize = texture_storage->render_target_get_size(render_target);
+		if (object_id_texture.is_valid()) {
+			copy_effects->copy_to_fb_rect(object_id_texture, texture_storage->render_target_get_rd_framebuffer(render_target), Rect2(Vector2(), rtsize), false, true);
+		} else {
+			copy_effects->copy_to_fb_rect(texture_storage->texture_rd_get_default(RendererRD::TextureStorage::DEFAULT_RD_TEXTURE_BLACK), texture_storage->render_target_get_rd_framebuffer(render_target), Rect2(Vector2(), rtsize), false, false);
+		}
 	}
 
 	if (debug_draw == RSE::VIEWPORT_DEBUG_DRAW_NORMAL_BUFFER && _render_buffers_get_normal_texture(rb).is_valid()) {

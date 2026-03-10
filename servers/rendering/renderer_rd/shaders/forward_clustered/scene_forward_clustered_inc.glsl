@@ -406,6 +406,7 @@ layout(r32ui, set = 1, binding = 27) uniform restrict uimage3D geom_facing_grid;
 #define depth_buffer shadow_atlas
 #define color_buffer shadow_atlas
 #define normal_roughness_buffer shadow_atlas
+#define object_id_buffer shadow_atlas
 
 #define multiviewSampler sampler2D
 #else
@@ -461,6 +462,12 @@ layout(set = 1, binding = 34) uniform texture2D ssil_buffer;
 layout(set = 1, binding = 35) uniform texture2D ssr_buffer;
 layout(set = 1, binding = 36) uniform texture2D ssr_mip_level_buffer;
 #endif // USE_MULTIVIEW
+
+#ifdef USE_MULTIVIEW
+layout(set = 1, binding = 38) uniform texture2DArray object_id_buffer;
+#else
+layout(set = 1, binding = 38) uniform texture2D object_id_buffer;
+#endif
 
 #endif
 

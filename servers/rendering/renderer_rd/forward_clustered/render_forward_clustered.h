@@ -52,6 +52,9 @@
 #define RB_TEX_SPECULAR_MSAA SNAME("specular_msaa")
 #define RB_TEX_NORMAL_ROUGHNESS SNAME("normal_roughness")
 #define RB_TEX_NORMAL_ROUGHNESS_MSAA SNAME("normal_roughness_msaa")
+#define RB_TEX_BACK_NORMAL_ROUGHNESS SNAME("back_normal_roughness")
+#define RB_TEX_OBJECT_ID SNAME("object_id")
+#define RB_TEX_BACK_OBJECT_ID SNAME("back_object_id")
 #define RB_TEX_VOXEL_GI SNAME("voxel_gi")
 #define RB_TEX_VOXEL_GI_MSAA SNAME("voxel_gi_msaa")
 
@@ -118,7 +121,8 @@ public:
 		enum DepthFrameBufferType {
 			DEPTH_FB,
 			DEPTH_FB_ROUGHNESS,
-			DEPTH_FB_ROUGHNESS_VOXELGI
+			DEPTH_FB_ROUGHNESS_VOXELGI,
+			DEPTH_FB_OBJECT_ID
 		};
 
 		RID render_sdfgi_uniform_set;
@@ -135,6 +139,17 @@ public:
 		RID get_normal_roughness(uint32_t p_layer) { return render_buffers->get_texture_slice(RB_SCOPE_FORWARD_CLUSTERED, RB_TEX_NORMAL_ROUGHNESS, p_layer, 0); }
 		RID get_normal_roughness_msaa() const { return render_buffers->get_texture(RB_SCOPE_FORWARD_CLUSTERED, RB_TEX_NORMAL_ROUGHNESS_MSAA); }
 		RID get_normal_roughness_msaa(uint32_t p_layer) { return render_buffers->get_texture_slice(RB_SCOPE_FORWARD_CLUSTERED, RB_TEX_NORMAL_ROUGHNESS_MSAA, p_layer, 0); }
+		bool has_back_normal_roughness() const { return render_buffers->has_texture(RB_SCOPE_FORWARD_CLUSTERED, RB_TEX_BACK_NORMAL_ROUGHNESS); }
+		RID get_back_normal_roughness() const { return render_buffers->get_texture(RB_SCOPE_FORWARD_CLUSTERED, RB_TEX_BACK_NORMAL_ROUGHNESS); }
+		RID get_back_normal_roughness(uint32_t p_layer) { return render_buffers->get_texture_slice(RB_SCOPE_FORWARD_CLUSTERED, RB_TEX_BACK_NORMAL_ROUGHNESS, p_layer, 0); }
+
+		void ensure_object_id_texture();
+		bool has_object_id() const { return render_buffers->has_texture(RB_SCOPE_FORWARD_CLUSTERED, RB_TEX_OBJECT_ID); }
+		RID get_object_id() const { return render_buffers->get_texture(RB_SCOPE_FORWARD_CLUSTERED, RB_TEX_OBJECT_ID); }
+		RID get_object_id(uint32_t p_layer) { return render_buffers->get_texture_slice(RB_SCOPE_FORWARD_CLUSTERED, RB_TEX_OBJECT_ID, p_layer, 0); }
+		bool has_back_object_id() const { return render_buffers->has_texture(RB_SCOPE_FORWARD_CLUSTERED, RB_TEX_BACK_OBJECT_ID); }
+		RID get_back_object_id() const { return render_buffers->get_texture(RB_SCOPE_FORWARD_CLUSTERED, RB_TEX_BACK_OBJECT_ID); }
+		RID get_back_object_id(uint32_t p_layer) { return render_buffers->get_texture_slice(RB_SCOPE_FORWARD_CLUSTERED, RB_TEX_BACK_OBJECT_ID, p_layer, 0); }
 
 		void ensure_voxelgi();
 		bool has_voxelgi() const { return render_buffers->has_texture(RB_SCOPE_FORWARD_CLUSTERED, RB_TEX_VOXEL_GI); }
@@ -163,6 +178,8 @@ public:
 		static uint32_t get_specular_usage_bits(bool p_resolve, bool p_msaa, bool p_storage);
 		static RD::DataFormat get_normal_roughness_format();
 		static uint32_t get_normal_roughness_usage_bits(bool p_resolve, bool p_msaa, bool p_storage);
+		static RD::DataFormat get_object_id_format();
+		static uint32_t get_object_id_usage_bits();
 		static RD::DataFormat get_voxelgi_format();
 		static uint32_t get_voxelgi_usage_bits(bool p_resolve, bool p_msaa, bool p_storage);
 	};
@@ -174,9 +191,25 @@ private:
 
 	uint64_t lightmap_texture_array_version = 0xFFFFFFFF;
 
+	enum NormalBufferSource {
+		NORMAL_BUFFER_SOURCE_DEFAULT,
+		NORMAL_BUFFER_SOURCE_LIVE,
+		NORMAL_BUFFER_SOURCE_SNAPSHOT,
+	};
+
+	enum ObjectIdBufferSource {
+		OBJECT_ID_BUFFER_SOURCE_DEFAULT,
+		OBJECT_ID_BUFFER_SOURCE_LIVE,
+		OBJECT_ID_BUFFER_SOURCE_SNAPSHOT,
+	};
+
 	void _update_render_base_uniform_set();
 	RID _setup_sdfgi_render_pass_uniform_set(RID p_albedo_texture, RID p_emission_texture, RID p_emission_aniso_texture, RID p_geom_facing_texture, const RendererRD::MaterialStorage::Samplers &p_samplers, uint32_t p_uniform_buffer_index);
-	RID _setup_render_pass_uniform_set(RenderListType p_render_list, const RenderDataRD *p_render_data, RID p_radiance_texture, const RendererRD::MaterialStorage::Samplers &p_samplers, uint32_t p_uniform_buffer_index, bool p_use_directional_shadow_atlas = false);
+	RID _setup_render_pass_uniform_set(RenderListType p_render_list, const RenderDataRD *p_render_data, RID p_radiance_texture, const RendererRD::MaterialStorage::Samplers &p_samplers, uint32_t p_uniform_buffer_index, bool p_use_directional_shadow_atlas = false, NormalBufferSource p_normal_buffer_source = NORMAL_BUFFER_SOURCE_LIVE, ObjectIdBufferSource p_object_id_buffer_source = OBJECT_ID_BUFFER_SOURCE_LIVE);
+	void _render_buffers_ensure_back_normal_roughness_texture(const RenderDataRD *p_render_data);
+	void _render_buffers_copy_back_normal_roughness(const RenderDataRD *p_render_data, bool p_use_msaa = false);
+	void _render_buffers_ensure_back_object_id_texture(const RenderDataRD *p_render_data);
+	void _render_buffers_copy_back_object_id(const RenderDataRD *p_render_data);
 
 	struct BestFitNormal {
 		BestFitNormalShaderRD shader;
@@ -199,6 +232,7 @@ private:
 		PASS_MODE_DEPTH,
 		PASS_MODE_DEPTH_NORMAL_ROUGHNESS,
 		PASS_MODE_DEPTH_NORMAL_ROUGHNESS_VOXEL_GI,
+		PASS_MODE_DEPTH_OBJECT_ID,
 		PASS_MODE_DEPTH_MATERIAL,
 		PASS_MODE_SDF,
 		PASS_MODE_MAX
@@ -209,6 +243,12 @@ private:
 		COLOR_PASS_FLAG_SEPARATE_SPECULAR = 1 << 1,
 		COLOR_PASS_FLAG_MULTIVIEW = 1 << 2,
 		COLOR_PASS_FLAG_MOTION_VECTORS = 1 << 3,
+	};
+
+	enum PrepassFeedbackMode {
+		PREPASS_FEEDBACK_RENDER_ALL,
+		PREPASS_FEEDBACK_SKIP,
+		PREPASS_FEEDBACK_ONLY,
 	};
 
 	struct GeometryInstanceSurfaceDataCache;
@@ -225,6 +265,7 @@ private:
 		uint32_t view_count = 1;
 		RID render_pass_uniform_set;
 		bool force_wireframe = false;
+		PrepassFeedbackMode prepass_feedback_mode = PREPASS_FEEDBACK_RENDER_ALL;
 		Vector2 uv_offset;
 		float lod_distance_multiplier = 0.0;
 		float screen_mesh_lod_threshold = 0.0;
@@ -233,7 +274,7 @@ private:
 		bool use_directional_soft_shadow = false;
 		SceneShaderForwardClustered::ShaderSpecialization base_specialization = {};
 
-		RenderListParameters(GeometryInstanceSurfaceDataCache **p_elements, RenderElementInfo *p_element_info, int p_element_count, bool p_reverse_cull, PassMode p_pass_mode, uint32_t p_color_pass_flags, bool p_no_gi, bool p_use_directional_soft_shadows, RID p_render_pass_uniform_set, bool p_force_wireframe = false, const Vector2 &p_uv_offset = Vector2(), float p_lod_distance_multiplier = 0.0, float p_screen_mesh_lod_threshold = 0.0, uint32_t p_view_count = 1, uint32_t p_element_offset = 0, SceneShaderForwardClustered::ShaderSpecialization p_base_specialization = {}) {
+		RenderListParameters(GeometryInstanceSurfaceDataCache **p_elements, RenderElementInfo *p_element_info, int p_element_count, bool p_reverse_cull, PassMode p_pass_mode, uint32_t p_color_pass_flags, bool p_no_gi, bool p_use_directional_soft_shadows, RID p_render_pass_uniform_set, bool p_force_wireframe = false, PrepassFeedbackMode p_prepass_feedback_mode = PREPASS_FEEDBACK_RENDER_ALL, const Vector2 &p_uv_offset = Vector2(), float p_lod_distance_multiplier = 0.0, float p_screen_mesh_lod_threshold = 0.0, uint32_t p_view_count = 1, uint32_t p_element_offset = 0, SceneShaderForwardClustered::ShaderSpecialization p_base_specialization = {}) {
 			elements = p_elements;
 			element_info = p_element_info;
 			element_count = p_element_count;
@@ -244,6 +285,7 @@ private:
 			view_count = p_view_count;
 			render_pass_uniform_set = p_render_pass_uniform_set;
 			force_wireframe = p_force_wireframe;
+			prepass_feedback_mode = p_prepass_feedback_mode;
 			uv_offset = p_uv_offset;
 			lod_distance_multiplier = p_lod_distance_multiplier;
 			screen_mesh_lod_threshold = p_screen_mesh_lod_threshold;
@@ -414,6 +456,8 @@ private:
 		bool used_screen_texture = false;
 		bool used_normal_texture = false;
 		bool used_depth_texture = false;
+		bool used_object_id_texture = false;
+		bool used_object_id_write = false;
 		bool used_sss = false;
 		bool used_lightmap = false;
 		bool used_opaque_stencil = false;
@@ -493,10 +537,13 @@ private:
 			FLAG_USES_SCREEN_TEXTURE = 4096,
 			FLAG_USES_DEPTH_TEXTURE = 8192,
 			FLAG_USES_NORMAL_TEXTURE = 16384,
-			FLAG_USES_DOUBLE_SIDED_SHADOWS = 32768,
-			FLAG_USES_PARTICLE_TRAILS = 65536,
-			FLAG_USES_MOTION_VECTOR = 131072,
-			FLAG_USES_STENCIL = 262144,
+			FLAG_USES_OBJECT_ID_TEXTURE = 32768,
+			FLAG_WRITES_OBJECT_ID = 65536,
+			FLAG_USES_DOUBLE_SIDED_SHADOWS = 131072,
+			FLAG_USES_PARTICLE_TRAILS = 262144,
+			FLAG_USES_MOTION_VECTOR = 524288,
+			FLAG_USES_STENCIL = 1048576,
+			FLAG_USES_PREPASS_FEEDBACK = FLAG_USES_DEPTH_TEXTURE | FLAG_USES_NORMAL_TEXTURE,
 		};
 
 		union {
@@ -636,6 +683,7 @@ private:
 				uint32_t use_separate_specular : 1;
 				uint32_t use_motion_vectors : 1;
 				uint32_t use_normal_and_roughness : 1;
+				uint32_t use_object_id : 1;
 				uint32_t use_lightmaps : 1;
 				uint32_t use_voxelgi : 1;
 				uint32_t use_sdfgi : 1;
@@ -670,6 +718,8 @@ private:
 		bool screen_texture_used = false;
 		bool normal_texture_used = false;
 		bool depth_texture_used = false;
+		bool object_id_texture_used = false;
+		bool object_id_write_used = false;
 		bool sss_used = false;
 	} global_surface_data;
 
