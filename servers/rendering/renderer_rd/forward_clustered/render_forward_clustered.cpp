@@ -79,6 +79,14 @@ void RenderForwardClustered::RenderBufferDataForwardClustered::ensure_object_id_
 	}
 }
 
+void RenderForwardClustered::RenderBufferDataForwardClustered::ensure_segment_texture() {
+	ERR_FAIL_NULL(render_buffers);
+
+	if (!render_buffers->has_texture(RB_SCOPE_FORWARD_CLUSTERED, RB_TEX_SEGMENT)) {
+		render_buffers->create_texture(RB_SCOPE_FORWARD_CLUSTERED, RB_TEX_SEGMENT, get_segment_format(), get_segment_usage_bits(), RD::TEXTURE_SAMPLES_1);
+	}
+}
+
 void RenderForwardClustered::RenderBufferDataForwardClustered::ensure_voxelgi() {
 	ERR_FAIL_NULL(render_buffers);
 
@@ -245,6 +253,14 @@ RID RenderForwardClustered::RenderBufferDataForwardClustered::get_depth_fb(Depth
 
 			return FramebufferCacheRD::get_singleton()->get_cache_multiview(render_buffers->get_view_count(), depth, object_id_buffer);
 		} break;
+		case DEPTH_FB_SEGMENT: {
+			ERR_FAIL_COND_V_MSG(use_msaa, RID(), "Segment prepass does not support MSAA yet.");
+			ensure_segment_texture();
+
+			RID segment_buffer = render_buffers->get_texture(RB_SCOPE_FORWARD_CLUSTERED, RB_TEX_SEGMENT);
+
+			return FramebufferCacheRD::get_singleton()->get_cache_multiview(render_buffers->get_view_count(), depth, segment_buffer);
+		} break;
 		default: {
 			ERR_FAIL_V(RID());
 		} break;
@@ -288,6 +304,14 @@ RD::DataFormat RenderForwardClustered::RenderBufferDataForwardClustered::get_obj
 }
 
 uint32_t RenderForwardClustered::RenderBufferDataForwardClustered::get_object_id_usage_bits() {
+	return RenderSceneBuffersRD::get_color_usage_bits(false, false, false);
+}
+
+RD::DataFormat RenderForwardClustered::RenderBufferDataForwardClustered::get_segment_format() {
+	return RD::DATA_FORMAT_R16_SFLOAT;
+}
+
+uint32_t RenderForwardClustered::RenderBufferDataForwardClustered::get_segment_usage_bits() {
 	return RenderSceneBuffersRD::get_color_usage_bits(false, false, false);
 }
 
@@ -366,6 +390,7 @@ void RenderForwardClustered::_render_list_template(RenderingDevice::DrawListID p
 		const RenderElementInfo &element_info = p_params->element_info[i];
 		const bool uses_prepass_feedback = (surf->flags & GeometryInstanceSurfaceDataCache::FLAG_USES_PREPASS_FEEDBACK) != 0;
 		const bool uses_object_id_feedback = (surf->flags & GeometryInstanceSurfaceDataCache::FLAG_WRITES_OBJECT_ID) && (surf->flags & GeometryInstanceSurfaceDataCache::FLAG_USES_OBJECT_ID_TEXTURE);
+		const bool uses_segment_feedback = (surf->flags & GeometryInstanceSurfaceDataCache::FLAG_WRITES_SEGMENT) && (surf->flags & GeometryInstanceSurfaceDataCache::FLAG_USES_SEGMENT_TEXTURE);
 
 		if (p_pass_mode == PASS_MODE_COLOR && surf->color_pass_inclusion_mask && (p_color_pass_flags & surf->color_pass_inclusion_mask) == 0) {
 			// Some surfaces can be repeated in multiple render lists. We exclude them from being rendered on the color pass based on the
@@ -388,6 +413,17 @@ void RenderForwardClustered::_render_list_template(RenderingDevice::DrawListID p
 				continue;
 			}
 			if (p_params->prepass_feedback_mode == PREPASS_FEEDBACK_ONLY && !uses_object_id_feedback) {
+				continue;
+			}
+		}
+		if (p_pass_mode == PASS_MODE_DEPTH_SEGMENT) {
+			if (!(surf->flags & GeometryInstanceSurfaceDataCache::FLAG_WRITES_SEGMENT)) {
+				continue;
+			}
+			if (p_params->prepass_feedback_mode == PREPASS_FEEDBACK_SKIP && uses_segment_feedback) {
+				continue;
+			}
+			if (p_params->prepass_feedback_mode == PREPASS_FEEDBACK_ONLY && !uses_segment_feedback) {
 				continue;
 			}
 		}
@@ -518,6 +554,9 @@ void RenderForwardClustered::_render_list_template(RenderingDevice::DrawListID p
 			} break;
 			case PASS_MODE_DEPTH_OBJECT_ID: {
 				pipeline_key.version = p_params->view_count > 1 ? SceneShaderForwardClustered::PIPELINE_VERSION_DEPTH_PASS_WITH_OBJECT_ID_MULTIVIEW : SceneShaderForwardClustered::PIPELINE_VERSION_DEPTH_PASS_WITH_OBJECT_ID;
+			} break;
+			case PASS_MODE_DEPTH_SEGMENT: {
+				pipeline_key.version = p_params->view_count > 1 ? SceneShaderForwardClustered::PIPELINE_VERSION_DEPTH_PASS_WITH_SEGMENT_MULTIVIEW : SceneShaderForwardClustered::PIPELINE_VERSION_DEPTH_PASS_WITH_SEGMENT;
 			} break;
 			case PASS_MODE_DEPTH_MATERIAL: {
 				ERR_FAIL_COND_MSG(p_params->view_count > 1, "Multiview not supported for material pass");
@@ -716,6 +755,9 @@ void RenderForwardClustered::_render_list(RenderingDevice::DrawListID p_draw_lis
 		} break;
 		case PASS_MODE_DEPTH_OBJECT_ID: {
 			_render_list_template<PASS_MODE_DEPTH_OBJECT_ID>(p_draw_list, p_framebuffer_Format, p_params, p_from_element, p_to_element);
+		} break;
+		case PASS_MODE_DEPTH_SEGMENT: {
+			_render_list_template<PASS_MODE_DEPTH_SEGMENT>(p_draw_list, p_framebuffer_Format, p_params, p_from_element, p_to_element);
 		} break;
 		case PASS_MODE_DEPTH_MATERIAL: {
 			_render_list_template<PASS_MODE_DEPTH_MATERIAL>(p_draw_list, p_framebuffer_Format, p_params, p_from_element, p_to_element);
@@ -975,6 +1017,8 @@ void RenderForwardClustered::_fill_render_list(RenderListType p_render_list, con
 		scene_state.used_depth_texture = false;
 		scene_state.used_object_id_texture = false;
 		scene_state.used_object_id_write = false;
+		scene_state.used_segment_texture = false;
+		scene_state.used_segment_write = false;
 		scene_state.used_lightmap = false;
 		scene_state.used_opaque_stencil = false;
 	}
@@ -1227,6 +1271,12 @@ void RenderForwardClustered::_fill_render_list(RenderListType p_render_list, con
 				}
 				if (surf->flags & GeometryInstanceSurfaceDataCache::FLAG_WRITES_OBJECT_ID) {
 					scene_state.used_object_id_write = true;
+				}
+				if (surf->flags & GeometryInstanceSurfaceDataCache::FLAG_USES_SEGMENT_TEXTURE) {
+					scene_state.used_segment_texture = true;
+				}
+				if (surf->flags & GeometryInstanceSurfaceDataCache::FLAG_WRITES_SEGMENT) {
+					scene_state.used_segment_write = true;
 				}
 				if ((surf->flags & GeometryInstanceSurfaceDataCache::FLAG_USES_STENCIL) && !force_alpha && (surf->flags & (GeometryInstanceSurfaceDataCache::FLAG_PASS_DEPTH | GeometryInstanceSurfaceDataCache::FLAG_PASS_OPAQUE))) {
 					scene_state.used_opaque_stencil = true;
@@ -2017,6 +2067,9 @@ void RenderForwardClustered::_render_scene(RenderDataRD *p_render_data, const Co
 	if (global_surface_data.object_id_write_used && !is_reflection_probe && rb->get_msaa_3d() == RSE::VIEWPORT_MSAA_DISABLED) {
 		rb_data->ensure_object_id_texture();
 	}
+	if (global_surface_data.segment_write_used && !is_reflection_probe && rb->get_msaa_3d() == RSE::VIEWPORT_MSAA_DISABLED) {
+		rb_data->ensure_segment_texture();
+	}
 
 	if (using_sss || using_separate_specular || scene_state.used_lightmap || using_voxelgi || global_surface_data.sss_used) {
 		scene_shader.enable_advanced_shader_group(p_render_data->scene_data->view_count > 1);
@@ -2029,6 +2082,9 @@ void RenderForwardClustered::_render_scene(RenderDataRD *p_render_data, const Co
 
 	if (global_surface_data.object_id_write_used && global_pipeline_data_required.texture_samples == RD::TEXTURE_SAMPLES_1) {
 		global_pipeline_data_required.use_object_id = true;
+	}
+	if (global_surface_data.segment_write_used && global_pipeline_data_required.texture_samples == RD::TEXTURE_SAMPLES_1) {
+		global_pipeline_data_required.use_segment = true;
 	}
 
 	if (scene_state.used_lightmap || scene_state.lightmaps_used > 0) {
@@ -2152,10 +2208,11 @@ void RenderForwardClustered::_render_scene(RenderDataRD *p_render_data, const Co
 
 	bool debug_voxelgis = get_debug_draw_mode() == RSE::VIEWPORT_DEBUG_DRAW_VOXEL_GI_ALBEDO || get_debug_draw_mode() == RSE::VIEWPORT_DEBUG_DRAW_VOXEL_GI_LIGHTING || get_debug_draw_mode() == RSE::VIEWPORT_DEBUG_DRAW_VOXEL_GI_EMISSION;
 	bool debug_sdfgi_probes = get_debug_draw_mode() == RSE::VIEWPORT_DEBUG_DRAW_SDFGI_PROBES;
-	bool force_depth_pre_pass = scene_state.used_opaque_stencil || scene_state.used_object_id_write;
+	bool force_depth_pre_pass = scene_state.used_opaque_stencil || scene_state.used_object_id_write || scene_state.used_segment_write;
 	bool depth_pre_pass = (force_depth_pre_pass || bool(GLOBAL_GET_CACHED(bool, "rendering/driver/depth_prepass/enable"))) && depth_framebuffer.is_valid();
 	const bool has_prepass_feedback = scene_state.used_depth_texture || scene_state.used_normal_texture;
 	const bool can_use_object_id_prepass = scene_state.used_object_id_write && !use_msaa && rb_data.is_valid() && !is_reflection_probe;
+	const bool can_use_segment_prepass = scene_state.used_segment_write && !use_msaa && rb_data.is_valid() && !is_reflection_probe;
 
 	SceneShaderForwardClustered::ShaderSpecialization base_specialization = scene_shader.default_specialization;
 	base_specialization.use_depth_fog = p_render_data->environment.is_valid() && environment_get_fog_mode(p_render_data->environment) == RSE::EnvironmentFogMode::ENV_FOG_MODE_DEPTH;
@@ -2180,7 +2237,7 @@ void RenderForwardClustered::_render_scene(RenderDataRD *p_render_data, const Co
 
 		RD::get_singleton()->draw_command_begin_label("Render Depth Pre-Pass");
 
-		RID rp_uniform_set = _setup_render_pass_uniform_set(RENDER_LIST_OPAQUE, p_render_data, RID(), samplers, depth_prepass_uniform_buffer_index, false, NORMAL_BUFFER_SOURCE_DEFAULT, OBJECT_ID_BUFFER_SOURCE_DEFAULT);
+		RID rp_uniform_set = _setup_render_pass_uniform_set(RENDER_LIST_OPAQUE, p_render_data, RID(), samplers, depth_prepass_uniform_buffer_index, false, NORMAL_BUFFER_SOURCE_DEFAULT, OBJECT_ID_BUFFER_SOURCE_DEFAULT, SEGMENT_BUFFER_SOURCE_DEFAULT);
 		PrepassFeedbackMode stage_one_feedback_mode = has_prepass_feedback ? PREPASS_FEEDBACK_SKIP : PREPASS_FEEDBACK_RENDER_ALL;
 		RenderListParameters render_list_params(render_list[RENDER_LIST_OPAQUE].elements.ptr(), render_list[RENDER_LIST_OPAQUE].element_info.ptr(), render_list[RENDER_LIST_OPAQUE].elements.size(), reverse_cull, depth_pass_mode, 0, rb_data.is_null(), p_render_data->directional_light_soft_shadows, rp_uniform_set, get_debug_draw_mode() == RSE::VIEWPORT_DEBUG_DRAW_WIREFRAME, stage_one_feedback_mode, Vector2(), p_render_data->scene_data->lod_distance_multiplier, p_render_data->scene_data->screen_mesh_lod_threshold, p_render_data->scene_data->view_count, 0, base_specialization);
 		_render_list_with_draw_list(&render_list_params, depth_framebuffer, RD::DrawFlags(needs_pre_resolve ? RD::DRAW_DEFAULT_ALL : RD::DRAW_CLEAR_ALL), depth_pass_clear, 0.0f, 0u, p_render_data->render_region);
@@ -2210,7 +2267,7 @@ void RenderForwardClustered::_render_scene(RenderDataRD *p_render_data, const Co
 				_render_buffers_copy_back_normal_roughness(p_render_data);
 			}
 
-			RID feedback_uniform_set = _setup_render_pass_uniform_set(RENDER_LIST_OPAQUE, p_render_data, RID(), samplers, depth_prepass_uniform_buffer_index, false, NORMAL_BUFFER_SOURCE_SNAPSHOT, OBJECT_ID_BUFFER_SOURCE_DEFAULT);
+			RID feedback_uniform_set = _setup_render_pass_uniform_set(RENDER_LIST_OPAQUE, p_render_data, RID(), samplers, depth_prepass_uniform_buffer_index, false, NORMAL_BUFFER_SOURCE_SNAPSHOT, OBJECT_ID_BUFFER_SOURCE_DEFAULT, SEGMENT_BUFFER_SOURCE_DEFAULT);
 			RenderListParameters feedback_render_list_params(render_list[RENDER_LIST_OPAQUE].elements.ptr(), render_list[RENDER_LIST_OPAQUE].element_info.ptr(), render_list[RENDER_LIST_OPAQUE].elements.size(), reverse_cull, depth_pass_mode, 0, rb_data.is_null(), p_render_data->directional_light_soft_shadows, feedback_uniform_set, get_debug_draw_mode() == RSE::VIEWPORT_DEBUG_DRAW_WIREFRAME, PREPASS_FEEDBACK_ONLY, Vector2(), p_render_data->scene_data->lod_distance_multiplier, p_render_data->scene_data->screen_mesh_lod_threshold, p_render_data->scene_data->view_count, 0, base_specialization);
 			_render_list_with_draw_list(&feedback_render_list_params, depth_framebuffer, RD::DRAW_DEFAULT_ALL, depth_pass_clear, 0.0f, 0u, p_render_data->render_region);
 		}
@@ -2248,7 +2305,7 @@ void RenderForwardClustered::_render_scene(RenderDataRD *p_render_data, const Co
 			object_id_clear.push_back(Color(0, 0, 0, 0));
 			RD::get_singleton()->draw_command_begin_label("Render Object ID Pre-Pass");
 
-			RID object_id_uniform_set = _setup_render_pass_uniform_set(RENDER_LIST_OPAQUE, p_render_data, RID(), samplers, depth_prepass_uniform_buffer_index, false, NORMAL_BUFFER_SOURCE_LIVE, OBJECT_ID_BUFFER_SOURCE_DEFAULT);
+			RID object_id_uniform_set = _setup_render_pass_uniform_set(RENDER_LIST_OPAQUE, p_render_data, RID(), samplers, depth_prepass_uniform_buffer_index, false, NORMAL_BUFFER_SOURCE_LIVE, OBJECT_ID_BUFFER_SOURCE_DEFAULT, SEGMENT_BUFFER_SOURCE_DEFAULT);
 			PrepassFeedbackMode object_id_stage_one_feedback_mode = has_object_id_feedback ? PREPASS_FEEDBACK_SKIP : PREPASS_FEEDBACK_RENDER_ALL;
 			RenderListParameters object_id_render_list_params(render_list[RENDER_LIST_OPAQUE].elements.ptr(), render_list[RENDER_LIST_OPAQUE].element_info.ptr(), render_list[RENDER_LIST_OPAQUE].elements.size(), reverse_cull, PASS_MODE_DEPTH_OBJECT_ID, 0, rb_data.is_null(), p_render_data->directional_light_soft_shadows, object_id_uniform_set, get_debug_draw_mode() == RSE::VIEWPORT_DEBUG_DRAW_WIREFRAME, object_id_stage_one_feedback_mode, Vector2(), p_render_data->scene_data->lod_distance_multiplier, p_render_data->scene_data->screen_mesh_lod_threshold, p_render_data->scene_data->view_count, 0, base_specialization);
 			_render_list_with_draw_list(&object_id_render_list_params, object_id_framebuffer, RD::DRAW_CLEAR_COLOR_ALL, object_id_clear, 0.0f, 0u, p_render_data->render_region);
@@ -2257,7 +2314,7 @@ void RenderForwardClustered::_render_scene(RenderDataRD *p_render_data, const Co
 				_render_buffers_ensure_back_object_id_texture(p_render_data);
 				_render_buffers_copy_back_object_id(p_render_data);
 
-				RID object_id_feedback_uniform_set = _setup_render_pass_uniform_set(RENDER_LIST_OPAQUE, p_render_data, RID(), samplers, depth_prepass_uniform_buffer_index, false, NORMAL_BUFFER_SOURCE_LIVE, OBJECT_ID_BUFFER_SOURCE_SNAPSHOT);
+				RID object_id_feedback_uniform_set = _setup_render_pass_uniform_set(RENDER_LIST_OPAQUE, p_render_data, RID(), samplers, depth_prepass_uniform_buffer_index, false, NORMAL_BUFFER_SOURCE_LIVE, OBJECT_ID_BUFFER_SOURCE_SNAPSHOT, SEGMENT_BUFFER_SOURCE_DEFAULT);
 				RenderListParameters object_id_feedback_render_list_params(render_list[RENDER_LIST_OPAQUE].elements.ptr(), render_list[RENDER_LIST_OPAQUE].element_info.ptr(), render_list[RENDER_LIST_OPAQUE].elements.size(), reverse_cull, PASS_MODE_DEPTH_OBJECT_ID, 0, rb_data.is_null(), p_render_data->directional_light_soft_shadows, object_id_feedback_uniform_set, get_debug_draw_mode() == RSE::VIEWPORT_DEBUG_DRAW_WIREFRAME, PREPASS_FEEDBACK_ONLY, Vector2(), p_render_data->scene_data->lod_distance_multiplier, p_render_data->scene_data->screen_mesh_lod_threshold, p_render_data->scene_data->view_count, 0, base_specialization);
 				_render_list_with_draw_list(&object_id_feedback_render_list_params, object_id_framebuffer, RD::DRAW_DEFAULT_ALL, depth_pass_clear, 0.0f, 0u, p_render_data->render_region);
 			}
@@ -2265,6 +2322,37 @@ void RenderForwardClustered::_render_scene(RenderDataRD *p_render_data, const Co
 			if (scene_state.used_object_id_texture) {
 				_render_buffers_ensure_back_object_id_texture(p_render_data);
 				_render_buffers_copy_back_object_id(p_render_data);
+			}
+
+			RD::get_singleton()->draw_command_end_label();
+		}
+	}
+
+	if (can_use_segment_prepass) {
+		RID segment_framebuffer = rb_data->get_depth_fb(RenderBufferDataForwardClustered::DEPTH_FB_SEGMENT);
+		if (segment_framebuffer.is_valid()) {
+			const bool has_segment_feedback = scene_state.used_segment_texture;
+			Vector<Color> segment_clear;
+			segment_clear.push_back(Color(0, 0, 0, 0));
+			RD::get_singleton()->draw_command_begin_label("Render Segment Pre-Pass");
+
+			RID segment_uniform_set = _setup_render_pass_uniform_set(RENDER_LIST_OPAQUE, p_render_data, RID(), samplers, depth_prepass_uniform_buffer_index, false, NORMAL_BUFFER_SOURCE_LIVE, OBJECT_ID_BUFFER_SOURCE_DEFAULT, SEGMENT_BUFFER_SOURCE_DEFAULT);
+			PrepassFeedbackMode segment_stage_one_feedback_mode = has_segment_feedback ? PREPASS_FEEDBACK_SKIP : PREPASS_FEEDBACK_RENDER_ALL;
+			RenderListParameters segment_render_list_params(render_list[RENDER_LIST_OPAQUE].elements.ptr(), render_list[RENDER_LIST_OPAQUE].element_info.ptr(), render_list[RENDER_LIST_OPAQUE].elements.size(), reverse_cull, PASS_MODE_DEPTH_SEGMENT, 0, rb_data.is_null(), p_render_data->directional_light_soft_shadows, segment_uniform_set, get_debug_draw_mode() == RSE::VIEWPORT_DEBUG_DRAW_WIREFRAME, segment_stage_one_feedback_mode, Vector2(), p_render_data->scene_data->lod_distance_multiplier, p_render_data->scene_data->screen_mesh_lod_threshold, p_render_data->scene_data->view_count, 0, base_specialization);
+			_render_list_with_draw_list(&segment_render_list_params, segment_framebuffer, RD::DRAW_CLEAR_COLOR_ALL, segment_clear, 0.0f, 0u, p_render_data->render_region);
+
+			if (has_segment_feedback) {
+				_render_buffers_ensure_back_segment_texture(p_render_data);
+				_render_buffers_copy_back_segment(p_render_data);
+
+				RID segment_feedback_uniform_set = _setup_render_pass_uniform_set(RENDER_LIST_OPAQUE, p_render_data, RID(), samplers, depth_prepass_uniform_buffer_index, false, NORMAL_BUFFER_SOURCE_LIVE, OBJECT_ID_BUFFER_SOURCE_DEFAULT, SEGMENT_BUFFER_SOURCE_SNAPSHOT);
+				RenderListParameters segment_feedback_render_list_params(render_list[RENDER_LIST_OPAQUE].elements.ptr(), render_list[RENDER_LIST_OPAQUE].element_info.ptr(), render_list[RENDER_LIST_OPAQUE].elements.size(), reverse_cull, PASS_MODE_DEPTH_SEGMENT, 0, rb_data.is_null(), p_render_data->directional_light_soft_shadows, segment_feedback_uniform_set, get_debug_draw_mode() == RSE::VIEWPORT_DEBUG_DRAW_WIREFRAME, PREPASS_FEEDBACK_ONLY, Vector2(), p_render_data->scene_data->lod_distance_multiplier, p_render_data->scene_data->screen_mesh_lod_threshold, p_render_data->scene_data->view_count, 0, base_specialization);
+				_render_list_with_draw_list(&segment_feedback_render_list_params, segment_framebuffer, RD::DRAW_DEFAULT_ALL, depth_pass_clear, 0.0f, 0u, p_render_data->render_region);
+			}
+
+			if (scene_state.used_segment_texture) {
+				_render_buffers_ensure_back_segment_texture(p_render_data);
+				_render_buffers_copy_back_segment(p_render_data);
 			}
 
 			RD::get_singleton()->draw_command_end_label();
@@ -2306,7 +2394,7 @@ void RenderForwardClustered::_render_scene(RenderDataRD *p_render_data, const Co
 
 	uint32_t opaque_pass_uniform_buffer_index = _setup_environment(p_render_data, is_reflection_probe, screen_size, screen_size, p_default_bg_color, true, using_motion_pass);
 
-	RID rp_uniform_set = _setup_render_pass_uniform_set(RENDER_LIST_OPAQUE, p_render_data, radiance_texture, samplers, opaque_pass_uniform_buffer_index, true, NORMAL_BUFFER_SOURCE_LIVE, OBJECT_ID_BUFFER_SOURCE_SNAPSHOT);
+RID rp_uniform_set = _setup_render_pass_uniform_set(RENDER_LIST_OPAQUE, p_render_data, radiance_texture, samplers, opaque_pass_uniform_buffer_index, true, NORMAL_BUFFER_SOURCE_LIVE, OBJECT_ID_BUFFER_SOURCE_SNAPSHOT, SEGMENT_BUFFER_SOURCE_SNAPSHOT);
 
 	{
 		bool render_motion_pass = !render_list[RENDER_LIST_MOTION].elements.is_empty();
@@ -2353,7 +2441,7 @@ void RenderForwardClustered::_render_scene(RenderDataRD *p_render_data, const Co
 
 			RENDER_TIMESTAMP("Render Motion Pass");
 
-			rp_uniform_set = _setup_render_pass_uniform_set(RENDER_LIST_MOTION, p_render_data, radiance_texture, samplers, opaque_pass_uniform_buffer_index, true, NORMAL_BUFFER_SOURCE_LIVE, OBJECT_ID_BUFFER_SOURCE_SNAPSHOT);
+			rp_uniform_set = _setup_render_pass_uniform_set(RENDER_LIST_MOTION, p_render_data, radiance_texture, samplers, opaque_pass_uniform_buffer_index, true, NORMAL_BUFFER_SOURCE_LIVE, OBJECT_ID_BUFFER_SOURCE_SNAPSHOT, SEGMENT_BUFFER_SOURCE_SNAPSHOT);
 
 			RenderListParameters render_list_params(render_list[RENDER_LIST_MOTION].elements.ptr(), render_list[RENDER_LIST_MOTION].element_info.ptr(), render_list[RENDER_LIST_MOTION].elements.size(), reverse_cull, PASS_MODE_COLOR, color_pass_flags, rb_data.is_null(), p_render_data->directional_light_soft_shadows, rp_uniform_set, get_debug_draw_mode() == RSE::VIEWPORT_DEBUG_DRAW_WIREFRAME, PREPASS_FEEDBACK_RENDER_ALL, Vector2(), p_render_data->scene_data->lod_distance_multiplier, p_render_data->scene_data->screen_mesh_lod_threshold, p_render_data->scene_data->view_count, 0, base_specialization);
 			_render_list_with_draw_list(&render_list_params, color_framebuffer);
@@ -2523,7 +2611,7 @@ void RenderForwardClustered::_render_scene(RenderDataRD *p_render_data, const Co
 
 	uint32_t transparent_pass_uniform_buffer_index = _setup_environment(p_render_data, is_reflection_probe, screen_size, screen_size, p_default_bg_color, false);
 
-	rp_uniform_set = _setup_render_pass_uniform_set(RENDER_LIST_ALPHA, p_render_data, radiance_texture, samplers, transparent_pass_uniform_buffer_index, true, NORMAL_BUFFER_SOURCE_LIVE, OBJECT_ID_BUFFER_SOURCE_SNAPSHOT);
+rp_uniform_set = _setup_render_pass_uniform_set(RENDER_LIST_ALPHA, p_render_data, radiance_texture, samplers, transparent_pass_uniform_buffer_index, true, NORMAL_BUFFER_SOURCE_LIVE, OBJECT_ID_BUFFER_SOURCE_SNAPSHOT, SEGMENT_BUFFER_SOURCE_SNAPSHOT);
 
 	{
 		uint32_t transparent_color_pass_flags = (color_pass_flags | uint32_t(COLOR_PASS_FLAG_TRANSPARENT)) & ~uint32_t(COLOR_PASS_FLAG_SEPARATE_SPECULAR);
@@ -2985,7 +3073,7 @@ void RenderForwardClustered::_render_shadow_process() {
 	for (uint32_t i = 0; i < scene_state.shadow_passes.size(); i++) {
 		//render passes need to be configured after instance buffer is done, since they need the latest version
 		SceneState::ShadowPass &shadow_pass = scene_state.shadow_passes[i];
-		shadow_pass.rp_uniform_set = _setup_render_pass_uniform_set(RENDER_LIST_SECONDARY, nullptr, RID(), RendererRD::MaterialStorage::get_singleton()->samplers_rd_get_default(), shadow_pass.uniform_buffer_index, false, NORMAL_BUFFER_SOURCE_DEFAULT, OBJECT_ID_BUFFER_SOURCE_DEFAULT);
+		shadow_pass.rp_uniform_set = _setup_render_pass_uniform_set(RENDER_LIST_SECONDARY, nullptr, RID(), RendererRD::MaterialStorage::get_singleton()->samplers_rd_get_default(), shadow_pass.uniform_buffer_index, false, NORMAL_BUFFER_SOURCE_DEFAULT, OBJECT_ID_BUFFER_SOURCE_DEFAULT, SEGMENT_BUFFER_SOURCE_DEFAULT);
 	}
 
 	RD::get_singleton()->draw_command_end_label();
@@ -3037,7 +3125,7 @@ void RenderForwardClustered::_render_particle_collider_heightfield(RID p_fb, con
 	render_list[RENDER_LIST_SECONDARY].sort_by_key();
 	_fill_instance_data(RENDER_LIST_SECONDARY);
 
-	RID rp_uniform_set = _setup_render_pass_uniform_set(RENDER_LIST_SECONDARY, nullptr, RID(), RendererRD::MaterialStorage::get_singleton()->samplers_rd_get_default(), uniform_buffer_index, false, NORMAL_BUFFER_SOURCE_DEFAULT, OBJECT_ID_BUFFER_SOURCE_DEFAULT);
+RID rp_uniform_set = _setup_render_pass_uniform_set(RENDER_LIST_SECONDARY, nullptr, RID(), RendererRD::MaterialStorage::get_singleton()->samplers_rd_get_default(), uniform_buffer_index, false, NORMAL_BUFFER_SOURCE_DEFAULT, OBJECT_ID_BUFFER_SOURCE_DEFAULT, SEGMENT_BUFFER_SOURCE_DEFAULT);
 
 	RENDER_TIMESTAMP("Render Collider Heightfield");
 
@@ -3088,7 +3176,7 @@ void RenderForwardClustered::_render_material(const Transform3D &p_cam_transform
 	render_list[RENDER_LIST_SECONDARY].sort_by_key();
 	_fill_instance_data(RENDER_LIST_SECONDARY);
 
-	RID rp_uniform_set = _setup_render_pass_uniform_set(RENDER_LIST_SECONDARY, nullptr, RID(), RendererRD::MaterialStorage::get_singleton()->samplers_rd_get_default(), uniform_buffer_index, false, NORMAL_BUFFER_SOURCE_DEFAULT, OBJECT_ID_BUFFER_SOURCE_DEFAULT);
+RID rp_uniform_set = _setup_render_pass_uniform_set(RENDER_LIST_SECONDARY, nullptr, RID(), RendererRD::MaterialStorage::get_singleton()->samplers_rd_get_default(), uniform_buffer_index, false, NORMAL_BUFFER_SOURCE_DEFAULT, OBJECT_ID_BUFFER_SOURCE_DEFAULT, SEGMENT_BUFFER_SOURCE_DEFAULT);
 
 	RENDER_TIMESTAMP("Render 3D Material");
 
@@ -3144,7 +3232,7 @@ void RenderForwardClustered::_render_uv2(const PagedArray<RenderGeometryInstance
 	render_list[RENDER_LIST_SECONDARY].sort_by_key();
 	_fill_instance_data(RENDER_LIST_SECONDARY);
 
-	RID rp_uniform_set = _setup_render_pass_uniform_set(RENDER_LIST_SECONDARY, nullptr, RID(), RendererRD::MaterialStorage::get_singleton()->samplers_rd_get_default(), uniform_buffer_index, false, NORMAL_BUFFER_SOURCE_DEFAULT, OBJECT_ID_BUFFER_SOURCE_DEFAULT);
+RID rp_uniform_set = _setup_render_pass_uniform_set(RENDER_LIST_SECONDARY, nullptr, RID(), RendererRD::MaterialStorage::get_singleton()->samplers_rd_get_default(), uniform_buffer_index, false, NORMAL_BUFFER_SOURCE_DEFAULT, OBJECT_ID_BUFFER_SOURCE_DEFAULT, SEGMENT_BUFFER_SOURCE_DEFAULT);
 
 	RENDER_TIMESTAMP("Render 3D Material");
 
@@ -3411,7 +3499,7 @@ void RenderForwardClustered::_update_render_base_uniform_set() {
 	}
 }
 
-RID RenderForwardClustered::_setup_render_pass_uniform_set(RenderListType p_render_list, const RenderDataRD *p_render_data, RID p_radiance_texture, const RendererRD::MaterialStorage::Samplers &p_samplers, uint32_t p_uniform_buffer_index, bool p_use_directional_shadow_atlas, NormalBufferSource p_normal_buffer_source, ObjectIdBufferSource p_object_id_buffer_source) {
+RID RenderForwardClustered::_setup_render_pass_uniform_set(RenderListType p_render_list, const RenderDataRD *p_render_data, RID p_radiance_texture, const RendererRD::MaterialStorage::Samplers &p_samplers, uint32_t p_uniform_buffer_index, bool p_use_directional_shadow_atlas, NormalBufferSource p_normal_buffer_source, ObjectIdBufferSource p_object_id_buffer_source, SegmentBufferSource p_segment_buffer_source) {
 	RendererRD::TextureStorage *texture_storage = RendererRD::TextureStorage::get_singleton();
 	RendererRD::LightStorage *light_storage = RendererRD::LightStorage::get_singleton();
 
@@ -3840,6 +3928,32 @@ RID RenderForwardClustered::_setup_render_pass_uniform_set(RenderListType p_rend
 		u.append_id(texture);
 		uniforms.push_back(u);
 	}
+	{
+		RD::Uniform u;
+		u.binding = 39;
+		u.uniform_type = RD::UNIFORM_TYPE_TEXTURE;
+		RID texture;
+		switch (p_segment_buffer_source) {
+			case SEGMENT_BUFFER_SOURCE_SNAPSHOT: {
+				if (rb_data.is_valid() && rb_data->has_back_segment()) {
+					texture = rb_data->get_back_segment();
+				}
+			} break;
+			case SEGMENT_BUFFER_SOURCE_LIVE: {
+				if (rb_data.is_valid() && rb_data->has_segment()) {
+					texture = rb_data->get_segment();
+				}
+			} break;
+			case SEGMENT_BUFFER_SOURCE_DEFAULT:
+			default: {
+			} break;
+		}
+		if (!texture.is_valid()) {
+			texture = texture_storage->texture_rd_get_default(is_multiview ? RendererRD::TextureStorage::DEFAULT_RD_TEXTURE_2D_ARRAY_BLACK : RendererRD::TextureStorage::DEFAULT_RD_TEXTURE_BLACK);
+		}
+		u.append_id(texture);
+		uniforms.push_back(u);
+	}
 
 	return UniformSetCacheRD::get_singleton()->get_cache_vec(scene_shader.default_shader_rd, RENDER_PASS_UNIFORM_SET, uniforms);
 }
@@ -4162,6 +4276,54 @@ void RenderForwardClustered::_render_buffers_copy_back_object_id(const RenderDat
 	RD::get_singleton()->draw_command_end_label();
 }
 
+void RenderForwardClustered::_render_buffers_ensure_back_segment_texture(const RenderDataRD *p_render_data) {
+	Ref<RenderSceneBuffersRD> rb = p_render_data->render_buffers;
+	ERR_FAIL_COND(rb.is_null());
+
+	Ref<RenderBufferDataForwardClustered> rb_data = rb->get_custom_data(RB_SCOPE_FORWARD_CLUSTERED);
+	ERR_FAIL_COND(rb_data.is_null());
+
+	if (!rb_data->has_segment() || rb_data->has_back_segment()) {
+		return;
+	}
+
+	uint32_t usage_bits = RD::TEXTURE_USAGE_SAMPLING_BIT;
+	usage_bits |= RD::TEXTURE_USAGE_CAN_COPY_TO_BIT | RD::TEXTURE_USAGE_STORAGE_BIT;
+	usage_bits |= RD::TEXTURE_USAGE_COLOR_ATTACHMENT_BIT;
+
+	rb->create_texture(RB_SCOPE_FORWARD_CLUSTERED, RB_TEX_BACK_SEGMENT, RenderBufferDataForwardClustered::get_segment_format(), usage_bits, RD::TEXTURE_SAMPLES_1);
+}
+
+void RenderForwardClustered::_render_buffers_copy_back_segment(const RenderDataRD *p_render_data) {
+	Ref<RenderSceneBuffersRD> rb = p_render_data->render_buffers;
+	ERR_FAIL_COND(rb.is_null());
+
+	Ref<RenderBufferDataForwardClustered> rb_data = rb->get_custom_data(RB_SCOPE_FORWARD_CLUSTERED);
+	ERR_FAIL_COND(rb_data.is_null());
+
+	if (!rb_data->has_segment() || !rb_data->has_back_segment()) {
+		return;
+	}
+
+	RD::get_singleton()->draw_command_begin_label("Copy Segment Texture");
+
+	bool can_use_storage = _render_buffers_can_be_storage();
+	Size2i size = rb->get_internal_size();
+	for (uint32_t v = 0; v < p_render_data->scene_data->view_count; v++) {
+		RID source_texture = rb_data->get_segment(v);
+		RID back_texture = rb_data->get_back_segment(v);
+
+		if (can_use_storage) {
+			copy_effects->copy_to_rect(source_texture, back_texture, Rect2i(0, 0, size.x, size.y));
+		} else {
+			RID back_fb = FramebufferCacheRD::get_singleton()->get_cache(back_texture);
+			copy_effects->copy_to_fb_rect(source_texture, back_fb, Rect2i(0, 0, size.x, size.y));
+		}
+	}
+
+	RD::get_singleton()->draw_command_end_label();
+}
+
 RID RenderForwardClustered::_render_buffers_get_velocity_texture(Ref<RenderSceneBuffersRD> p_render_buffers) {
 	return p_render_buffers->get_velocity_buffer(false);
 }
@@ -4365,6 +4527,16 @@ void RenderForwardClustered::_geometry_instance_add_surface_with_material(Geomet
 	if (p_material->shader_data->writes_object_id) {
 		flags |= GeometryInstanceSurfaceDataCache::FLAG_WRITES_OBJECT_ID;
 		global_surface_data.object_id_write_used = true;
+	}
+
+	if (p_material->shader_data->uses_segment_texture) {
+		flags |= GeometryInstanceSurfaceDataCache::FLAG_USES_SEGMENT_TEXTURE;
+		global_surface_data.segment_texture_used = true;
+	}
+
+	if (p_material->shader_data->writes_segment) {
+		flags |= GeometryInstanceSurfaceDataCache::FLAG_WRITES_SEGMENT;
+		global_surface_data.segment_write_used = true;
 	}
 
 	if (ginstance->data->cast_double_sided_shadows) {
@@ -4767,7 +4939,7 @@ static RD::FramebufferFormatID _get_reflection_probe_color_framebuffer_format_fo
 	return RD::get_singleton()->framebuffer_format_create(attachments);
 }
 
-static RD::FramebufferFormatID _get_depth_framebuffer_format_for_pipeline(bool p_can_be_storage, RD::TextureSamples p_samples, bool p_normal_roughness, bool p_voxelgi, bool p_object_id = false) {
+static RD::FramebufferFormatID _get_depth_framebuffer_format_for_pipeline(bool p_can_be_storage, RD::TextureSamples p_samples, bool p_normal_roughness, bool p_voxelgi, bool p_object_id = false, bool p_segment = false) {
 	const bool multisampling = p_samples > RD::TEXTURE_SAMPLES_1;
 	RD::AttachmentFormat attachment;
 	attachment.samples = p_samples;
@@ -4795,6 +4967,13 @@ static RD::FramebufferFormatID _get_depth_framebuffer_format_for_pipeline(bool p
 		attachment.format = RenderForwardClustered::RenderBufferDataForwardClustered::get_object_id_format();
 		attachment.samples = RD::TEXTURE_SAMPLES_1;
 		attachment.usage_flags = RenderForwardClustered::RenderBufferDataForwardClustered::get_object_id_usage_bits();
+		attachments.push_back(attachment);
+	}
+
+	if (p_segment) {
+		attachment.format = RenderForwardClustered::RenderBufferDataForwardClustered::get_segment_format();
+		attachment.samples = RD::TEXTURE_SAMPLES_1;
+		attachment.usage_flags = RenderForwardClustered::RenderBufferDataForwardClustered::get_segment_usage_bits();
 		attachments.push_back(attachment);
 	}
 
@@ -4956,6 +5135,12 @@ void RenderForwardClustered::_mesh_compile_pipelines_for_surface(const SurfacePi
 	if (p_global.use_object_id && p_surface.shader->writes_object_id) {
 		pipeline_key.version = SceneShaderForwardClustered::PIPELINE_VERSION_DEPTH_PASS_WITH_OBJECT_ID;
 		pipeline_key.framebuffer_format_id = _get_depth_framebuffer_format_for_pipeline(false, RD::TEXTURE_SAMPLES_1, false, false, true);
+		_mesh_compile_pipeline_for_surface(p_surface.shader, p_surface.mesh_surface, true, p_surface.instanced, p_source, pipeline_key, r_pipeline_pairs);
+	}
+
+	if (p_global.use_segment && p_surface.shader->writes_segment) {
+		pipeline_key.version = SceneShaderForwardClustered::PIPELINE_VERSION_DEPTH_PASS_WITH_SEGMENT;
+		pipeline_key.framebuffer_format_id = _get_depth_framebuffer_format_for_pipeline(false, RD::TEXTURE_SAMPLES_1, false, false, false, true);
 		_mesh_compile_pipeline_for_surface(p_surface.shader, p_surface.mesh_surface, true, p_surface.instanced, p_source, pipeline_key, r_pipeline_pairs);
 	}
 

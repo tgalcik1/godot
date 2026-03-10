@@ -1014,6 +1014,7 @@ bool RendererSceneRenderRD::_debug_draw_can_use_effects(RSE::ViewportDebugDraw p
 		case RSE::VIEWPORT_DEBUG_DRAW_MOTION_VECTORS:
 		// Modes that draws a buffer over viewport needs camera effects because if the buffer is not available it will be equivalent to normal draw mode.
 		case RSE::VIEWPORT_DEBUG_DRAW_DEPTH_BUFFER:
+		case RSE::VIEWPORT_DEBUG_DRAW_SEGMENT_BUFFER:
 		case RSE::VIEWPORT_DEBUG_DRAW_OBJECT_ID_BUFFER:
 		case RSE::VIEWPORT_DEBUG_DRAW_NORMAL_BUFFER:
 		case RSE::VIEWPORT_DEBUG_DRAW_SSAO:
@@ -1138,6 +1139,26 @@ void RendererSceneRenderRD::_render_buffers_debug_draw(const RenderDataRD *p_ren
 		Size2 rtsize = texture_storage->render_target_get_size(render_target);
 		if (object_id_texture.is_valid()) {
 			copy_effects->copy_to_fb_rect(object_id_texture, texture_storage->render_target_get_rd_framebuffer(render_target), Rect2(Vector2(), rtsize), false, true);
+		} else {
+			copy_effects->copy_to_fb_rect(texture_storage->texture_rd_get_default(RendererRD::TextureStorage::DEFAULT_RD_TEXTURE_BLACK), texture_storage->render_target_get_rd_framebuffer(render_target), Rect2(Vector2(), rtsize), false, false);
+		}
+	}
+
+	if (debug_draw == RSE::VIEWPORT_DEBUG_DRAW_SEGMENT_BUFFER) {
+		static const StringName rb_scope_forward_clustered("forward_clustered");
+		static const StringName rb_tex_back_segment("back_segment");
+		static const StringName rb_tex_segment("segment");
+
+		RID segment_texture;
+		if (rb->has_texture(rb_scope_forward_clustered, rb_tex_back_segment)) {
+			segment_texture = rb->get_texture(rb_scope_forward_clustered, rb_tex_back_segment);
+		} else if (rb->has_texture(rb_scope_forward_clustered, rb_tex_segment)) {
+			segment_texture = rb->get_texture(rb_scope_forward_clustered, rb_tex_segment);
+		}
+
+		Size2 rtsize = texture_storage->render_target_get_size(render_target);
+		if (segment_texture.is_valid()) {
+			copy_effects->copy_to_fb_rect(segment_texture, texture_storage->render_target_get_rd_framebuffer(render_target), Rect2(Vector2(), rtsize), false, true);
 		} else {
 			copy_effects->copy_to_fb_rect(texture_storage->texture_rd_get_default(RendererRD::TextureStorage::DEFAULT_RD_TEXTURE_BLACK), texture_storage->render_target_get_rd_framebuffer(render_target), Rect2(Vector2(), rtsize), false, false);
 		}

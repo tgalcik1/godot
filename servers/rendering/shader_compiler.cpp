@@ -530,6 +530,7 @@ String ShaderCompiler::_dump_node_code(const SL::Node *p_node, int p_level, Gene
 								E.value.hint == SL::ShaderNode::Uniform::HINT_NORMAL_ROUGHNESS_TEXTURE ||
 								E.value.hint == SL::ShaderNode::Uniform::HINT_DEPTH_TEXTURE ||
 								E.value.hint == SL::ShaderNode::Uniform::HINT_OBJECT_ID_TEXTURE ||
+								E.value.hint == SL::ShaderNode::Uniform::HINT_SEGMENT_TEXTURE ||
 								E.value.hint == SL::ShaderNode::Uniform::HINT_BLIT_SOURCE0 ||
 								E.value.hint == SL::ShaderNode::Uniform::HINT_BLIT_SOURCE1 ||
 								E.value.hint == SL::ShaderNode::Uniform::HINT_BLIT_SOURCE2 ||
@@ -580,6 +581,7 @@ String ShaderCompiler::_dump_node_code(const SL::Node *p_node, int p_level, Gene
 						uniform.hint == SL::ShaderNode::Uniform::HINT_NORMAL_ROUGHNESS_TEXTURE ||
 						uniform.hint == SL::ShaderNode::Uniform::HINT_DEPTH_TEXTURE ||
 						uniform.hint == SL::ShaderNode::Uniform::HINT_OBJECT_ID_TEXTURE ||
+						uniform.hint == SL::ShaderNode::Uniform::HINT_SEGMENT_TEXTURE ||
 						uniform.hint == SL::ShaderNode::Uniform::HINT_BLIT_SOURCE0 ||
 						uniform.hint == SL::ShaderNode::Uniform::HINT_BLIT_SOURCE1 ||
 						uniform.hint == SL::ShaderNode::Uniform::HINT_BLIT_SOURCE2 ||
@@ -951,6 +953,9 @@ String ShaderCompiler::_dump_node_code(const SL::Node *p_node, int p_level, Gene
 						} else if (u.hint == ShaderLanguage::ShaderNode::Uniform::HINT_OBJECT_ID_TEXTURE) {
 							name = "object_id_buffer";
 							r_gen_code.uses_object_id_texture = true;
+						} else if (u.hint == ShaderLanguage::ShaderNode::Uniform::HINT_SEGMENT_TEXTURE) {
+							name = "segment_buffer";
+							r_gen_code.uses_segment_texture = true;
 						} else if (u.hint == ShaderLanguage::ShaderNode::Uniform::HINT_BLIT_SOURCE0) {
 							name = "source0";
 						} else if (u.hint == ShaderLanguage::ShaderNode::Uniform::HINT_BLIT_SOURCE1) {
@@ -1307,6 +1312,8 @@ String ShaderCompiler::_dump_node_code(const SL::Node *p_node, int p_level, Gene
 											is_normal_roughness_texture = true;
 										} else if (u.hint == ShaderLanguage::ShaderNode::Uniform::HINT_OBJECT_ID_TEXTURE) {
 											is_depth_texture = true;
+										} else if (u.hint == ShaderLanguage::ShaderNode::Uniform::HINT_SEGMENT_TEXTURE) {
+											is_depth_texture = true;
 										}
 										sampler_name = _get_sampler_name(u.filter, u.repeat);
 									} else {
@@ -1328,6 +1335,8 @@ String ShaderCompiler::_dump_node_code(const SL::Node *p_node, int p_level, Gene
 													} else if (function->arguments[j].tex_hint == ShaderLanguage::ShaderNode::Uniform::HINT_NORMAL_ROUGHNESS_TEXTURE) {
 														is_normal_roughness_texture = true;
 													} else if (function->arguments[j].tex_hint == ShaderLanguage::ShaderNode::Uniform::HINT_OBJECT_ID_TEXTURE) {
+														is_depth_texture = true;
+													} else if (function->arguments[j].tex_hint == ShaderLanguage::ShaderNode::Uniform::HINT_SEGMENT_TEXTURE) {
 														is_depth_texture = true;
 													}
 													sampler_name = _get_sampler_name(function->arguments[j].tex_argument_filter, function->arguments[j].tex_argument_repeat);
@@ -1375,6 +1384,8 @@ String ShaderCompiler::_dump_node_code(const SL::Node *p_node, int p_level, Gene
 										} else if (u.hint == ShaderLanguage::ShaderNode::Uniform::HINT_NORMAL_ROUGHNESS_TEXTURE) {
 											multiview_uv_needed = true;
 										} else if (u.hint == ShaderLanguage::ShaderNode::Uniform::HINT_OBJECT_ID_TEXTURE) {
+											multiview_uv_needed = true;
+										} else if (u.hint == ShaderLanguage::ShaderNode::Uniform::HINT_SEGMENT_TEXTURE) {
 											multiview_uv_needed = true;
 										}
 									}
@@ -1638,6 +1649,7 @@ Error ShaderCompiler::compile(RSE::ShaderMode p_mode, const String &p_code, Iden
 	r_gen_code.uses_depth_texture = false;
 	r_gen_code.uses_normal_roughness_texture = false;
 	r_gen_code.uses_object_id_texture = false;
+	r_gen_code.uses_segment_texture = false;
 
 	used_name_defines.clear();
 	used_rmode_defines.clear();

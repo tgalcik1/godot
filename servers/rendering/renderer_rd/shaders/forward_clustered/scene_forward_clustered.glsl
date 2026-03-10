@@ -1058,6 +1058,10 @@ layout(location = 1) out uvec2 voxel_gi_buffer;
 #ifdef MODE_RENDER_OBJECT_ID
 layout(location = 0) out float object_id_output_buffer;
 #endif
+
+#ifdef MODE_RENDER_SEGMENT
+layout(location = 0) out float segment_output_buffer;
+#endif
 #else // RENDER DEPTH
 
 #ifdef MODE_SEPARATE_SPECULAR
@@ -1256,6 +1260,7 @@ void fragment_shader(in SceneData scene_data) {
 
 	float ao = 1.0;
 	float ao_light_affect = 0.0;
+	float segment = 0.0;
 
 	float alpha_highp = float(instances.data[instance_index].flags >> INSTANCE_FLAGS_FADE_SHIFT) / float(255.0);
 
@@ -2968,6 +2973,10 @@ void fragment_shader(in SceneData scene_data) {
 
 #ifdef MODE_RENDER_OBJECT_ID
 	object_id_output_buffer = object_id_hash(read_model_matrix[3].xyz);
+#endif
+
+#ifdef MODE_RENDER_SEGMENT
+	segment_output_buffer = segment;
 #endif
 
 //nothing happens, so a tree-ssa optimizer will result in no fragment shader :)

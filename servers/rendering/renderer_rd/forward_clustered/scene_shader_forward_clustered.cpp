@@ -83,7 +83,9 @@ void SceneShaderForwardClustered::ShaderData::set_code(const String &p_code) {
 	uses_particle_trails = false;
 	uses_z_clip_scale = false;
 	uses_object_id_texture = false;
+	uses_segment_texture = false;
 	writes_object_id = false;
+	writes_segment = false;
 
 	int depth_drawi = DEPTH_DRAW_OPAQUE;
 
@@ -138,6 +140,7 @@ void SceneShaderForwardClustered::ShaderData::set_code(const String &p_code) {
 	actions.usage_flag_pointers["TIME"] = &uses_time;
 	actions.usage_flag_pointers["ROUGHNESS"] = &uses_roughness;
 	actions.usage_flag_pointers["NORMAL"] = &uses_normal;
+	actions.usage_flag_pointers["SEGMENT"] = &writes_segment;
 	actions.usage_flag_pointers["NORMAL_MAP"] = &uses_normal_map;
 	actions.usage_flag_pointers["BENT_NORMAL_MAP"] = &uses_bent_normal_map;
 
@@ -203,6 +206,7 @@ void SceneShaderForwardClustered::ShaderData::set_code(const String &p_code) {
 	uses_depth_texture = gen_code.uses_depth_texture;
 	uses_normal_texture = gen_code.uses_normal_roughness_texture;
 	uses_object_id_texture = gen_code.uses_object_id_texture;
+	uses_segment_texture = gen_code.uses_segment_texture;
 	uses_vertex_time = gen_code.uses_vertex_time;
 	uses_fragment_time = gen_code.uses_fragment_time;
 	uses_normal |= uses_normal_map;
@@ -297,6 +301,10 @@ uint16_t SceneShaderForwardClustered::ShaderData::_get_shader_version(PipelineVe
 			return ShaderVersion::SHADER_VERSION_DEPTH_PASS_WITH_OBJECT_ID + ubershader_base;
 		case PIPELINE_VERSION_DEPTH_PASS_WITH_OBJECT_ID_MULTIVIEW:
 			return ShaderVersion::SHADER_VERSION_DEPTH_PASS_WITH_OBJECT_ID_MULTIVIEW + ubershader_base;
+		case PIPELINE_VERSION_DEPTH_PASS_WITH_SEGMENT:
+			return ShaderVersion::SHADER_VERSION_DEPTH_PASS_WITH_SEGMENT + ubershader_base;
+		case PIPELINE_VERSION_DEPTH_PASS_WITH_SEGMENT_MULTIVIEW:
+			return ShaderVersion::SHADER_VERSION_DEPTH_PASS_WITH_SEGMENT_MULTIVIEW + ubershader_base;
 		case PIPELINE_VERSION_DEPTH_PASS_WITH_MATERIAL:
 			return ShaderVersion::SHADER_VERSION_DEPTH_PASS_WITH_MATERIAL + ubershader_base;
 		case PIPELINE_VERSION_DEPTH_PASS_WITH_SDF:
@@ -356,6 +364,7 @@ void SceneShaderForwardClustered::ShaderData::_create_pipeline(PipelineKey p_pip
 	RD::PipelineColorBlendState blend_state_depth_normal_roughness = RD::PipelineColorBlendState::create_disabled(1);
 	RD::PipelineColorBlendState blend_state_depth_normal_roughness_giprobe = RD::PipelineColorBlendState::create_disabled(2);
 	RD::PipelineColorBlendState blend_state_depth_object_id = RD::PipelineColorBlendState::create_disabled(1);
+	RD::PipelineColorBlendState blend_state_depth_segment = RD::PipelineColorBlendState::create_disabled(1);
 
 	RD::PipelineDepthStencilState depth_stencil_state;
 
@@ -476,6 +485,10 @@ void SceneShaderForwardClustered::ShaderData::_create_pipeline(PipelineKey p_pip
 			case PIPELINE_VERSION_DEPTH_PASS_WITH_OBJECT_ID:
 			case PIPELINE_VERSION_DEPTH_PASS_WITH_OBJECT_ID_MULTIVIEW:
 				blend_state = blend_state_depth_object_id;
+				break;
+			case PIPELINE_VERSION_DEPTH_PASS_WITH_SEGMENT:
+			case PIPELINE_VERSION_DEPTH_PASS_WITH_SEGMENT_MULTIVIEW:
+				blend_state = blend_state_depth_segment;
 				break;
 			case PIPELINE_VERSION_DEPTH_PASS_WITH_MATERIAL:
 				// Writes to normal and roughness in opaque way.
@@ -664,6 +677,8 @@ void SceneShaderForwardClustered::init(const String p_defines) {
 			shader_versions.push_back(ShaderRD::VariantDefine(SHADER_GROUP_ADVANCED_MULTIVIEW, base_define + "\n#define USE_MULTIVIEW\n#define MODE_RENDER_DEPTH\n#define MODE_RENDER_NORMAL_ROUGHNESS\n#define MODE_RENDER_VOXEL_GI\n", false)); // SHADER_VERSION_DEPTH_PASS_WITH_NORMAL_AND_ROUGHNESS_AND_VOXEL_GI_MULTIVIEW
 			shader_versions.push_back(ShaderRD::VariantDefine(SHADER_GROUP_BASE, base_define + "\n#define MODE_RENDER_DEPTH\n#define MODE_RENDER_OBJECT_ID\n", true)); // SHADER_VERSION_DEPTH_PASS_WITH_OBJECT_ID
 			shader_versions.push_back(ShaderRD::VariantDefine(SHADER_GROUP_MULTIVIEW, base_define + "\n#define USE_MULTIVIEW\n#define MODE_RENDER_DEPTH\n#define MODE_RENDER_OBJECT_ID\n", false)); // SHADER_VERSION_DEPTH_PASS_WITH_OBJECT_ID_MULTIVIEW
+			shader_versions.push_back(ShaderRD::VariantDefine(SHADER_GROUP_BASE, base_define + "\n#define MODE_RENDER_DEPTH\n#define MODE_RENDER_SEGMENT\n", true)); // SHADER_VERSION_DEPTH_PASS_WITH_SEGMENT
+			shader_versions.push_back(ShaderRD::VariantDefine(SHADER_GROUP_MULTIVIEW, base_define + "\n#define USE_MULTIVIEW\n#define MODE_RENDER_DEPTH\n#define MODE_RENDER_SEGMENT\n", false)); // SHADER_VERSION_DEPTH_PASS_WITH_SEGMENT_MULTIVIEW
 			shader_versions.push_back(ShaderRD::VariantDefine(SHADER_GROUP_ADVANCED, base_define + "\n#define MODE_RENDER_DEPTH\n#define MODE_RENDER_MATERIAL\n", false)); // SHADER_VERSION_DEPTH_PASS_WITH_MATERIAL
 			shader_versions.push_back(ShaderRD::VariantDefine(SHADER_GROUP_ADVANCED, base_define + "\n#define MODE_RENDER_DEPTH\n#define MODE_RENDER_SDF\n", false)); // SHADER_VERSION_DEPTH_PASS_WITH_SDF
 		}
@@ -784,6 +799,7 @@ void SceneShaderForwardClustered::init(const String p_defines) {
 		actions.renames["INSTANCE_CUSTOM"] = "instance_custom";
 		actions.renames["SCREEN_UV"] = "screen_uv";
 		actions.renames["DEPTH"] = "gl_FragDepth";
+		actions.renames["SEGMENT"] = "segment";
 		actions.renames["FOG"] = "fog";
 		actions.renames["RADIANCE"] = "custom_radiance";
 		actions.renames["IRRADIANCE"] = "custom_irradiance";

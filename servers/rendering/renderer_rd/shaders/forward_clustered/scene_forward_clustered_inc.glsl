@@ -469,6 +469,12 @@ layout(set = 1, binding = 38) uniform texture2DArray object_id_buffer;
 layout(set = 1, binding = 38) uniform texture2D object_id_buffer;
 #endif
 
+#ifdef USE_MULTIVIEW
+layout(set = 1, binding = 39) uniform texture2DArray segment_buffer;
+#else
+layout(set = 1, binding = 39) uniform texture2D segment_buffer;
+#endif
+
 #endif
 
 vec4 normal_roughness_compatibility(vec4 p_normal_roughness) {

@@ -91,6 +91,7 @@ public:
 		bool uses_depth_texture = false;
 		bool uses_normal_roughness_texture = false;
 		bool uses_object_id_texture = false;
+		bool uses_segment_texture = false;
 	};
 
 	struct DefaultIdentifierActions {
