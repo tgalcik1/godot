@@ -1087,11 +1087,6 @@ layout(location = 2) out vec2 motion_vector;
 vec3 frag_to_light_outlines = vec3(0.0);
 #endif
 
-float object_id_hash(vec3 p_world_origin) {
-	float h = dot(p_world_origin, vec3(12.9898, 78.233, 37.719));
-	return fract(sin(h) * 43758.5453);
-}
-
 #include "../scene_forward_aa_inc.glsl"
 
 #if !defined(MODE_RENDER_DEPTH) && !defined(MODE_UNSHADED)
@@ -2981,7 +2976,7 @@ void fragment_shader(in SceneData scene_data) {
 #endif //MODE_RENDER_NORMAL_ROUGHNESS
 
 #ifdef MODE_RENDER_OBJECT_ID
-	object_id_output_buffer = object_id_hash(read_model_matrix[3].xyz);
+	object_id_output_buffer = float(instance_index + 1u);
 #endif
 
 #ifdef MODE_RENDER_SEGMENT

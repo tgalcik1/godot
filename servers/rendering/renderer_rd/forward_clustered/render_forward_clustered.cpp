@@ -316,7 +316,7 @@ uint32_t RenderForwardClustered::RenderBufferDataForwardClustered::get_normal_ro
 }
 
 RD::DataFormat RenderForwardClustered::RenderBufferDataForwardClustered::get_object_id_format() {
-	return RD::DATA_FORMAT_R16_SFLOAT;
+	return RD::DATA_FORMAT_R32_SFLOAT;
 }
 
 uint32_t RenderForwardClustered::RenderBufferDataForwardClustered::get_object_id_usage_bits() {
@@ -4068,7 +4068,6 @@ RID RenderForwardClustered::_setup_render_pass_uniform_set(RenderListType p_rend
 		u.append_id(texture);
 		uniforms.push_back(u);
 	}
-
 	return UniformSetCacheRD::get_singleton()->get_cache_vec(scene_shader.default_shader_rd, RENDER_PASS_UNIFORM_SET, uniforms);
 }
 
@@ -4114,7 +4113,6 @@ RID RenderForwardClustered::_setup_sdfgi_render_pass_uniform_set(RID p_albedo_te
 		u.append_id(radiance_texture);
 		uniforms.push_back(u);
 	}
-
 	{
 		// No reflection atlas.
 		RID ref_texture = texture_storage->texture_rd_get_default(RendererRD::TextureStorage::DEFAULT_RD_TEXTURE_2D_ARRAY_BLACK);
@@ -5475,6 +5473,10 @@ RenderGeometryInstance *RenderForwardClustered::geometry_instance_create(RID p_b
 
 	GeometryInstanceForwardClustered *ginstance = geometry_instance_alloc.alloc();
 	ginstance->data = memnew(GeometryInstanceForwardClustered::Data);
+	ginstance->object_id = next_geometry_object_id++;
+	if (unlikely(next_geometry_object_id == 0)) {
+		next_geometry_object_id = 1;
+	}
 
 	ginstance->data->base = p_base;
 	ginstance->data->base_type = type;

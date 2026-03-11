@@ -489,7 +489,6 @@ private:
 
 		MultiUmaBuffer<1u> instance_buffer[RENDER_LIST_MAX] = { MultiUmaBuffer<1u>("RENDER_LIST_OPAQUE"), MultiUmaBuffer<1u>("RENDER_LIST_MOTION"), MultiUmaBuffer<1u>("RENDER_LIST_ALPHA"), MultiUmaBuffer<1u>("RENDER_LIST_SECONDARY") };
 		InstanceData *curr_gpu_ptr[RENDER_LIST_MAX] = {};
-
 		LightmapCaptureData *lightmap_captures = nullptr;
 		uint32_t max_lightmap_captures;
 		RID lightmap_capture_buffer;
@@ -659,6 +658,7 @@ private:
 		//used during rendering
 
 		uint32_t gi_offset_cache = 0;
+		uint32_t object_id = 0;
 		bool store_transform_cache = true;
 		RID transforms_uniform_set;
 		uint32_t instance_count = 0;
@@ -712,6 +712,7 @@ private:
 	PagedAllocator<GeometryInstanceForwardClustered> geometry_instance_alloc;
 	PagedAllocator<GeometryInstanceSurfaceDataCache> geometry_instance_surface_alloc;
 	PagedAllocator<GeometryInstanceLightmapSH> geometry_instance_lightmap_sh;
+	uint32_t next_geometry_object_id = 1;
 
 	struct SurfacePipelineData {
 		void *mesh_surface = nullptr;
