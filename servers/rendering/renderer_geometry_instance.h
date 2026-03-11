@@ -52,6 +52,7 @@ public:
 	virtual void set_pivot_data(float p_sorting_offset, bool p_use_aabb_center) = 0;
 	virtual void set_lod_bias(float p_lod_bias) = 0;
 	virtual void set_layer_mask(uint32_t p_layer_mask) = 0;
+	virtual void set_object_id(uint32_t p_object_id) = 0;
 	virtual void set_fade_range(bool p_enable_near, float p_near_begin, float p_near_end, bool p_enable_far, float p_far_begin, float p_far_end) = 0;
 	virtual void set_parent_fade_alpha(float p_alpha) = 0;
 	virtual void set_transparency(float p_transparency) = 0;
@@ -98,6 +99,7 @@ public:
 	bool use_aabb_center = true;
 
 	uint32_t layer_mask = 1;
+	uint32_t object_id_override = 0;
 
 	bool fade_near = false;
 	float fade_near_begin = 0;
@@ -141,6 +143,7 @@ public:
 	virtual void set_pivot_data(float p_sorting_offset, bool p_use_aabb_center) override;
 	virtual void set_lod_bias(float p_lod_bias) override;
 	virtual void set_layer_mask(uint32_t p_layer_mask) override;
+	virtual void set_object_id(uint32_t p_object_id) override;
 	virtual void set_fade_range(bool p_enable_near, float p_near_begin, float p_near_end, bool p_enable_far, float p_far_begin, float p_far_end) override;
 	virtual void set_parent_fade_alpha(float p_alpha) override;
 	virtual void set_transparency(float p_transparency) override;

@@ -470,6 +470,7 @@ public:
 		AABB *custom_aabb = nullptr; // <Zylann> would using aabb directly with a bool be better?
 		float extra_margin;
 		ObjectID object_id;
+		uint32_t geometry_object_id = 0;
 
 		// sorting
 		float sorting_offset = 0.0;
@@ -1061,6 +1062,7 @@ public:
 
 	virtual void instance_geometry_set_lightmap(RID p_instance, RID p_lightmap, const Rect2 &p_lightmap_uv_scale, int p_slice_index);
 	virtual void instance_geometry_set_lod_bias(RID p_instance, float p_lod_bias);
+	virtual void instance_geometry_set_object_id(RID p_instance, uint32_t p_object_id);
 
 	virtual void instance_geometry_set_shader_parameter(RID p_instance, const StringName &p_parameter, const Variant &p_value);
 	virtual void instance_geometry_get_shader_parameter_list(RID p_instance, List<PropertyInfo> *p_parameters) const;

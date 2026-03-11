@@ -334,7 +334,7 @@ implementation_data_block;
 struct InstanceData {
 	mat3x4 transform;
 	vec4 compressed_aabb_position_pad; // Only .xyz is used. .w is padding.
-	vec4 compressed_aabb_size_pad; // Only .xyz is used. .w is padding.
+	vec4 compressed_aabb_size_pad; // .xyz is size, .w stores object id as float.
 	vec4 uv_scale;
 	uint flags;
 	uint instance_uniforms_ofs; //base offset in global buffer for instance variables

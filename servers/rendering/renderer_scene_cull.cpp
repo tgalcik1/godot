@@ -732,6 +732,7 @@ void RendererSceneCull::instance_set_base(RID p_instance, RID p_base) {
 				geom->geometry_instance->set_surface_materials(instance->materials);
 				geom->geometry_instance->set_transform(instance->transform, instance->aabb, instance->transformed_aabb);
 				geom->geometry_instance->set_layer_mask(instance->layer_mask);
+				geom->geometry_instance->set_object_id(instance->geometry_object_id);
 				geom->geometry_instance->set_pivot_data(instance->sorting_offset, instance->use_aabb_center);
 				geom->geometry_instance->set_lod_bias(instance->lod_bias);
 				geom->geometry_instance->set_transparency(instance->transparency);
@@ -1011,6 +1012,21 @@ void RendererSceneCull::instance_attach_object_instance_id(RID p_instance, Objec
 	ERR_FAIL_NULL(instance);
 
 	instance->object_id = p_id;
+}
+
+void RendererSceneCull::instance_geometry_set_object_id(RID p_instance, uint32_t p_object_id) {
+	Instance *instance = instance_owner.get_or_null(p_instance);
+	ERR_FAIL_NULL(instance);
+
+	instance->geometry_object_id = p_object_id;
+
+	if ((1 << instance->base_type) & RSE::INSTANCE_GEOMETRY_MASK) {
+		InstanceGeometryData *geom = static_cast<InstanceGeometryData *>(instance->base_data);
+		ERR_FAIL_NULL(geom);
+		if (geom->geometry_instance != nullptr) {
+			geom->geometry_instance->set_object_id(p_object_id);
+		}
+	}
 }
 
 void RendererSceneCull::instance_set_blend_shape_weight(RID p_instance, int p_shape, float p_weight) {

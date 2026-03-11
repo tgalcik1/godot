@@ -446,15 +446,19 @@ private:
 				compressed_aabb_position[0] = p_aabb.position.x;
 				compressed_aabb_position[1] = p_aabb.position.y;
 				compressed_aabb_position[2] = p_aabb.position.z;
+				compressed_aabb_position[3] = 0.0f;
 
 				compressed_aabb_size[0] = p_aabb.size.x;
 				compressed_aabb_size[1] = p_aabb.size.y;
 				compressed_aabb_size[2] = p_aabb.size.z;
+				compressed_aabb_size[3] = 0.0f;
 #else
 				Vector3 *compressed_aabb_position_vec3 = reinterpret_cast<Vector3 *>(compressed_aabb_position);
 				Vector3 *compressed_aabb_size_vec3 = reinterpret_cast<Vector3 *>(compressed_aabb_size);
 				*compressed_aabb_position_vec3 = p_aabb.position;
 				*compressed_aabb_size_vec3 = p_aabb.size;
+				compressed_aabb_position[3] = 0.0f;
+				compressed_aabb_size[3] = 0.0f;
 #endif
 			}
 

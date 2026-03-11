@@ -30,6 +30,7 @@
 
 #pragma once
 
+#include "core/object/object_id.h"
 #include "scene/3d/node_3d.h"
 #include "servers/rendering/rendering_server_enums.h"
 
@@ -151,8 +152,15 @@ protected:
 	bool _get(const StringName &p_name, Variant &r_ret) const;
 	void _get_property_list(List<PropertyInfo> *p_list) const;
 	void _validate_property(PropertyInfo &p_property) const;
+	void _notification(int p_what);
 
 	static void _bind_methods();
+
+private:
+	NodePath outline_group_root;
+
+	static uint32_t _make_outline_group_object_id(ObjectID p_object_id);
+	void _update_outline_group_object_id();
 
 public:
 	void set_cast_shadows_setting(ShadowCastingSetting p_shadow_casting_setting);
@@ -207,6 +215,10 @@ public:
 
 	void set_ignore_occlusion_culling(bool p_enabled);
 	bool is_ignoring_occlusion_culling();
+
+	void set_outline_group_root(const NodePath &p_root);
+	NodePath get_outline_group_root() const;
+	uint32_t get_outline_object_id() const;
 
 	virtual Ref<TriangleMesh> generate_triangle_mesh() const;
 

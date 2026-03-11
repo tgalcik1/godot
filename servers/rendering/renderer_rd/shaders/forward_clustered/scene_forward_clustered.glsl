@@ -2976,7 +2976,7 @@ void fragment_shader(in SceneData scene_data) {
 #endif //MODE_RENDER_NORMAL_ROUGHNESS
 
 #ifdef MODE_RENDER_OBJECT_ID
-	object_id_output_buffer = float(instance_index + 1u);
+	object_id_output_buffer = instances.data[instance_index].compressed_aabb_size_pad.w;
 #endif
 
 #ifdef MODE_RENDER_SEGMENT

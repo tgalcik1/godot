@@ -36,6 +36,7 @@ STATIC_ASSERT_INCOMPLETE_TYPE(class, RenderingServer);
 #include "core/object/callable_mp.h"
 #include "core/object/class_db.h"
 #include "core/os/os.h"
+#include "core/templates/hashfuncs.h"
 #include "scene/main/scene_tree.h"
 #include "scene/resources/material.h"
 #include "servers/rendering/rendering_server.h"
@@ -321,6 +322,30 @@ const StringName *GeometryInstance3D::_instance_uniform_get_remap(const StringNa
 	return r;
 }
 
+uint32_t GeometryInstance3D::_make_outline_group_object_id(ObjectID p_object_id) {
+	if (p_object_id.is_null()) {
+		return 0;
+	}
+
+	// Keep IDs exactly representable in the float object-id buffer.
+	uint32_t hash = hash_murmur3_one_64(p_object_id);
+	hash &= 0x00FFFFFF;
+	return hash == 0 ? 1 : hash;
+}
+
+void GeometryInstance3D::_update_outline_group_object_id() {
+	RS::get_singleton()->instance_geometry_set_object_id(get_instance(), get_outline_object_id());
+}
+
+void GeometryInstance3D::_notification(int p_what) {
+	VisualInstance3D::_notification(p_what);
+
+	if (p_what == NOTIFICATION_ENTER_TREE) {
+		_update_outline_group_object_id();
+		callable_mp(this, &GeometryInstance3D::_update_outline_group_object_id).call_deferred();
+	}
+}
+
 bool GeometryInstance3D::_set(const StringName &p_name, const Variant &p_value) {
 	const StringName *r = _instance_uniform_get_remap(p_name);
 	if (r) {
@@ -510,6 +535,32 @@ bool GeometryInstance3D::is_ignoring_occlusion_culling() {
 	return ignore_occlusion_culling;
 }
 
+void GeometryInstance3D::set_outline_group_root(const NodePath &p_root) {
+	if (outline_group_root == p_root) {
+		return;
+	}
+
+	outline_group_root = p_root;
+	_update_outline_group_object_id();
+}
+
+NodePath GeometryInstance3D::get_outline_group_root() const {
+	return outline_group_root;
+}
+
+uint32_t GeometryInstance3D::get_outline_object_id() const {
+	Node3D *source = const_cast<GeometryInstance3D *>(this);
+
+	if (!outline_group_root.is_empty() && is_inside_tree()) {
+		Node3D *root = Object::cast_to<Node3D>(get_node_or_null(outline_group_root));
+		if (root != nullptr) {
+			source = root;
+		}
+	}
+
+	return _make_outline_group_object_id(source->get_instance_id());
+}
+
 Ref<TriangleMesh> GeometryInstance3D::generate_triangle_mesh() const {
 	return Ref<TriangleMesh>();
 }
@@ -547,6 +598,10 @@ void GeometryInstance3D::_validate_property(PropertyInfo &p_property) const {
 }
 
 void GeometryInstance3D::_bind_methods() {
+	ClassDB::bind_method(D_METHOD("set_outline_group_root", "root"), &GeometryInstance3D::set_outline_group_root);
+	ClassDB::bind_method(D_METHOD("get_outline_group_root"), &GeometryInstance3D::get_outline_group_root);
+	ClassDB::bind_method(D_METHOD("get_outline_object_id"), &GeometryInstance3D::get_outline_object_id);
+
 	ClassDB::bind_method(D_METHOD("set_material_override", "material"), &GeometryInstance3D::set_material_override);
 	ClassDB::bind_method(D_METHOD("get_material_override"), &GeometryInstance3D::get_material_override);
 
@@ -625,6 +680,9 @@ void GeometryInstance3D::_bind_methods() {
 	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "visibility_range_end", PROPERTY_HINT_RANGE, "0.0,4096.0,0.01,or_greater,suffix:m"), "set_visibility_range_end", "get_visibility_range_end");
 	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "visibility_range_end_margin", PROPERTY_HINT_RANGE, "0.0,4096.0,0.01,or_greater,suffix:m"), "set_visibility_range_end_margin", "get_visibility_range_end_margin");
 	ADD_PROPERTY(PropertyInfo(Variant::INT, "visibility_range_fade_mode", PROPERTY_HINT_ENUM, "Disabled,Self,Dependencies"), "set_visibility_range_fade_mode", "get_visibility_range_fade_mode");
+
+	ADD_GROUP("Outline", "outline_");
+	ADD_PROPERTY(PropertyInfo(Variant::NODE_PATH, "outline_group_root", PROPERTY_HINT_NODE_PATH_VALID_TYPES, "Node3D"), "set_outline_group_root", "get_outline_group_root");
 
 	BIND_ENUM_CONSTANT(SHADOW_CASTING_SETTING_OFF);
 	BIND_ENUM_CONSTANT(SHADOW_CASTING_SETTING_ON);

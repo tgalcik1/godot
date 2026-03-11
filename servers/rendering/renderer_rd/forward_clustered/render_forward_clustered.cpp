@@ -1000,6 +1000,7 @@ void RenderForwardClustered::_fill_instance_data(RenderListType p_render_list, i
 		}
 
 		instance_data.set_compressed_aabb(surface_aabb);
+		instance_data.compressed_aabb_size[3] = float(inst->object_id_override != 0 ? inst->object_id_override : inst->object_id);
 		instance_data.set_uv_scale(uv_scale);
 
 		scene_state.curr_gpu_ptr[p_render_list][i + p_offset] = instance_data;
