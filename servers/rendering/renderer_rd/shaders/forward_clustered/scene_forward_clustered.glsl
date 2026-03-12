@@ -2638,7 +2638,7 @@ void fragment_shader(in SceneData scene_data) {
 			shadow = mix(1.0, shadow, directional_lights.data[i].shadow_opacity);
 #endif
 
-			blur_shadow(shadow);
+			shadow = float(blur_shadow(half(shadow)));
 
 #ifdef DEBUG_DRAW_PSSM_SPLITS
 			vec3 tint = vec3(1.0);
@@ -2657,13 +2657,15 @@ void fragment_shader(in SceneData scene_data) {
 
 			float size_A = sc_use_directional_soft_shadows() ? directional_lights.data[i].size : 0.0;
 
-			light_compute(normal, directional_lights.data[i].direction, normalize(view), size_A,
+			current_shadow_light_type = CUSTOM_LIGHT_TYPE_DIRECTIONAL;
+			current_shadow_light_index = i;
+			light_compute(normal, directional_lights.data[i].direction, normalize(view), vertex, size_A,
 #ifndef DEBUG_DRAW_PSSM_SPLITS
 					directional_lights.data[i].color * directional_lights.data[i].energy,
 #else
 					directional_lights.data[i].color * directional_lights.data[i].energy * tint,
 #endif
-					true, shadow, f0, roughness, metallic, directional_lights.data[i].specular, albedo, alpha, screen_uv, energy_compensation,
+					true, half(1.0), half(shadow), f0, roughness, metallic, directional_lights.data[i].specular, albedo, alpha, screen_uv, energy_compensation,
 #ifdef LIGHT_BACKLIGHT_USED
 					backlight,
 #endif

@@ -2100,7 +2100,7 @@ void main() {
 #ifndef SHADOWS_DISABLED
 			shadow = mix(half(1.0), shadows[i], half(directional_lights.data[i].shadow_opacity));
 #endif
-			blur_shadow(shadow);
+			shadow = float(blur_shadow(half(shadow)));
 
 			vec3 tint = vec3(1.0);
 #ifdef DEBUG_DRAW_PSSM_SPLITS
@@ -2119,9 +2119,11 @@ void main() {
 
 			float size_A = sc_use_light_soft_shadows() ? directional_lights.data[i].size : 0.0;
 
-			light_compute(normal, hvec3(directional_lights.data[i].direction), view, saturateHalf(size_A),
+			current_shadow_light_type = CUSTOM_LIGHT_TYPE_DIRECTIONAL;
+			current_shadow_light_index = i;
+			light_compute(normal, hvec3(directional_lights.data[i].direction), view, vertex, saturateHalf(size_A),
 					hvec3(directional_lights.data[i].color * directional_lights.data[i].energy * tint),
-					true, shadow, f0, roughness, metallic, half(directional_lights.data[i].specular), albedo, alpha,
+					true, half(1.0), shadow, f0, roughness, metallic, half(directional_lights.data[i].specular), albedo, alpha,
 					screen_uv, hvec3(1.0),
 #ifdef LIGHT_BACKLIGHT_USED
 					backlight,
