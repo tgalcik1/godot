@@ -78,6 +78,11 @@ const uint CUSTOM_LIGHT_TYPE_SPOT = 2u;
 uint current_shadow_light_type = CUSTOM_LIGHT_TYPE_DIRECTIONAL;
 uint current_shadow_light_index = 0u;
 
+vec3 light_cookie_world_vertex = vec3(0.0);
+vec3 light_cookie_right_world = vec3(1.0, 0.0, 0.0);
+vec3 light_cookie_up_world = vec3(0.0, 1.0, 0.0);
+bool light_cookie_is_directional = false;
+
 mat4 scene_read_view_matrix() {
 	return transpose(mat4(scene_data_block.data.view_matrix[0],
 			scene_data_block.data.view_matrix[1],
@@ -96,6 +101,14 @@ half blur_shadow(half shadow);
 #define blur_shadow_f(x) float(blur_shadow(half(x)))
 float sample_directional_shadow(vec3 world_pos);
 float sample_positional_shadow(vec3 world_pos);
+
+vec2 light_cookie_uv() {
+	if (!light_cookie_is_directional) {
+		return vec2(0.0);
+	}
+
+	return vec2(dot(light_cookie_world_vertex, light_cookie_right_world), dot(light_cookie_world_vertex, light_cookie_up_world));
+}
 
 void light_compute(hvec3 N, hvec3 L, hvec3 V, vec3 vertex, half A, hvec3 light_color, bool is_directional, half distance_attenuation, half shadow_attenuation, hvec3 f0, half roughness, half metallic, half specular_amount, hvec3 albedo, inout half alpha, vec2 screen_uv, hvec3 energy_compensation,
 #ifdef LIGHT_BACKLIGHT_USED
@@ -158,6 +171,15 @@ void light_compute(hvec3 N, hvec3 L, hvec3 V, vec3 vertex, half A, hvec3 light_c
 	float attenuation_highp = distance_attenuation_highp * shadow_attenuation_highp;
 	vec3 diffuse_light_highp = vec3(diffuse_light);
 	vec3 specular_light_highp = vec3(specular_light);
+	light_cookie_world_vertex = world_vertex;
+	light_cookie_is_directional = is_directional;
+	if (is_directional) {
+		light_cookie_right_world = directional_lights.data[current_shadow_light_index].cookie_right;
+		light_cookie_up_world = directional_lights.data[current_shadow_light_index].cookie_up;
+	} else {
+		light_cookie_right_world = vec3(1.0, 0.0, 0.0);
+		light_cookie_up_world = vec3(0.0, 1.0, 0.0);
+	}
 
 #CODE : LIGHT
 

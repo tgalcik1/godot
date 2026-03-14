@@ -226,6 +226,8 @@ ShaderTypes::ShaderTypes() {
 	shader_modes[RSE::SHADER_SPATIAL].functions["light"].built_ins["ROUGHNESS"] = constt(ShaderLanguage::TYPE_FLOAT);
 	shader_modes[RSE::SHADER_SPATIAL].functions["light"].built_ins["OUTLINES"] = constt(ShaderLanguage::TYPE_VEC3);
 	shader_modes[RSE::SHADER_SPATIAL].functions["light"].built_ins["WORLD_VERTEX"] = constt(ShaderLanguage::TYPE_VEC3);
+	shader_modes[RSE::SHADER_SPATIAL].functions["light"].built_ins["LIGHT_COOKIE_RIGHT"] = constt(ShaderLanguage::TYPE_VEC3);
+	shader_modes[RSE::SHADER_SPATIAL].functions["light"].built_ins["LIGHT_COOKIE_UP"] = constt(ShaderLanguage::TYPE_VEC3);
 	shader_modes[RSE::SHADER_SPATIAL].functions["light"].built_ins["DIFFUSE_LIGHT"] = ShaderLanguage::TYPE_VEC3;
 	shader_modes[RSE::SHADER_SPATIAL].functions["light"].built_ins["SPECULAR_LIGHT"] = ShaderLanguage::TYPE_VEC3;
 	shader_modes[RSE::SHADER_SPATIAL].functions["light"].built_ins["ALPHA"] = ShaderLanguage::TYPE_FLOAT;
@@ -237,6 +239,12 @@ ShaderTypes::ShaderTypes() {
 		func.return_type = ShaderLanguage::TYPE_FLOAT;
 		shader_modes[RSE::SHADER_SPATIAL].functions["light"].stage_functions["sample_directional_shadow"] = func;
 		shader_modes[RSE::SHADER_SPATIAL].functions["light"].stage_functions["sample_positional_shadow"] = func;
+	}
+	{
+		ShaderLanguage::StageFunctionInfo func;
+		func.skip_function = "vertex";
+		func.return_type = ShaderLanguage::TYPE_VEC2;
+		shader_modes[RSE::SHADER_SPATIAL].functions["light"].stage_functions["LIGHT_COOKIE_UV"] = func;
 	}
 
 	shader_modes[RSE::SHADER_SPATIAL].functions["light"].can_discard = true;

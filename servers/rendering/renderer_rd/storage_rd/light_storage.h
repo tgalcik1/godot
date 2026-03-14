@@ -196,7 +196,10 @@ private:
 		float shadow_opacity;
 		float fade_from;
 		float fade_to;
-		uint32_t pad[2];
+		float cookie_right[3];
+		float cookie_pad0;
+		float cookie_up[3];
+		float cookie_pad1;
 		uint32_t bake_mode;
 		float volumetric_fog_energy;
 		float shadow_bias[4];
@@ -210,6 +213,7 @@ private:
 		float uv_scale2[2];
 		float uv_scale3[2];
 		float uv_scale4[2];
+		uint32_t pad_end[2];
 	};
 
 	uint32_t max_directional_lights;

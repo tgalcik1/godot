@@ -845,6 +845,9 @@ void SceneShaderForwardClustered::init(const String p_defines) {
 		actions.renames["LIGHT_COLOR"] = "light_color_highp";
 		actions.renames["LIGHT_IS_DIRECTIONAL"] = "is_directional";
 		actions.renames["LIGHT"] = "light_highp";
+		actions.renames["LIGHT_COOKIE_RIGHT"] = "light_cookie_right_world";
+		actions.renames["LIGHT_COOKIE_UP"] = "light_cookie_up_world";
+		actions.renames["LIGHT_COOKIE_UV"] = "light_cookie_uv";
 		actions.renames["ATTENUATION"] = "attenuation_highp";
 		actions.renames["DISTANCE_ATTENUATION"] = "distance_attenuation_highp";
 		actions.renames["SHADOW_ATTENUATION"] = "shadow_attenuation_highp";

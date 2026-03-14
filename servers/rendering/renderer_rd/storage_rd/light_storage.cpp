@@ -642,10 +642,18 @@ void LightStorage::update_light_buffers(RenderDataRD *p_render_data, const Paged
 				Transform3D light_transform = light_instance->transform;
 
 				Vector3 direction = inverse_transform.basis.xform(light_transform.basis.xform(Vector3(0, 0, 1))).normalized();
+				Vector3 cookie_right = light_transform.basis.xform(Vector3(1, 0, 0)).normalized();
+				Vector3 cookie_up = light_transform.basis.xform(Vector3(0, 1, 0)).normalized();
 
 				light_data.direction[0] = direction.x;
 				light_data.direction[1] = direction.y;
 				light_data.direction[2] = direction.z;
+				light_data.cookie_right[0] = cookie_right.x;
+				light_data.cookie_right[1] = cookie_right.y;
+				light_data.cookie_right[2] = cookie_right.z;
+				light_data.cookie_up[0] = cookie_up.x;
+				light_data.cookie_up[1] = cookie_up.y;
+				light_data.cookie_up[2] = cookie_up.z;
 
 				float sign = light->negative ? -1 : 1;
 
