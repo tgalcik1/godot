@@ -73,6 +73,7 @@ struct DirectionalLightData {
 	float cookie_pad1;
 	uint bake_mode;
 	float volumetric_fog_energy;
+	uvec2 pad_after_volumetric;
 	vec4 shadow_bias;
 	vec4 shadow_normal_bias;
 	vec4 shadow_transmittance_bias;

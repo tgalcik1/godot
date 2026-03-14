@@ -202,6 +202,7 @@ private:
 		float cookie_pad1;
 		uint32_t bake_mode;
 		float volumetric_fog_energy;
+		uint32_t pad_after_volumetric[2];
 		float shadow_bias[4];
 		float shadow_normal_bias[4];
 		float shadow_transmittance_bias[4];
